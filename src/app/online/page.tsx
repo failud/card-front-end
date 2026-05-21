@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useOnlineGameStore } from '@/stores/online-game-store';
 import { getSocket } from '@/lib/socket';
+import { useBeforeUnload } from '@/hooks/use-before-unload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +31,9 @@ export default function OnlinePage() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
+
+  // Warn before leaving while in a room
+  useBeforeUnload(phase === 'lobby' && !!roomCode, roomCode);
 
   useEffect(() => {
     if (!nickname) { router.push('/'); return; }
@@ -244,9 +248,18 @@ export default function OnlinePage() {
           </div>
         )}
 
-        {!mounted ? (
+        {!mounted || isReconnecting ? (
           <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>
-        ) : phase === 'lobby' && roomCode ? renderLobby() : renderForms()}
+        ) : phase === 'lobby' && roomCode ? (
+          renderLobby()
+        ) : phase === 'ready-check' || phase === 'playing' ? (
+          <div className="text-center py-12">
+            <div className="inline-block w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin mb-3" />
+            <p className="text-gray-400">{t('game.starting')}</p>
+          </div>
+        ) : (
+          renderForms()
+        )}
       </div>
     </div>
   );

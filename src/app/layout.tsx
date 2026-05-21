@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { I18nProvider } from '@/lib/i18n';
 import { LangProvider } from '@/components/ui/lang-provider';
 import { Toast } from '@/components/ui/toast';
+import { RejoinBanner } from '@/components/layout/rejoin-banner';
 import { Noto_Sans_Lao } from 'next/font/google';
 
 const notoSansLao = Noto_Sans_Lao({
@@ -25,11 +26,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="th" className={`${notoSansLao.variable} h-full antialiased dark`} suppressHydrationWarning>
-      <body className="min-h-full flex flex-col bg-gray-950 text-white">
+      <body className="min-h-full flex flex-col bg-gray-950 text-white" suppressHydrationWarning>
         <TooltipProvider>
           <I18nProvider>
             <LangProvider />
             <Toast />
+            <RejoinBanner />
             <Topbar />
             <div className="flex flex-1">
               <Sidebar />

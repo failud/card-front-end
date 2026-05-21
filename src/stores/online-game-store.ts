@@ -2,7 +2,8 @@
 
 import { create } from 'zustand';
 import { getSocket, connectSocket } from '@/lib/socket';
-import type { Card, PlayRecord, InstantWinResult, WinDetail } from '@/types';
+import { sortHand } from '@/lib/deck';
+import type { Card, PlayRecord, InstantWinResult, WinDetail, ArrangeMode } from '@/types';
 import { useAuthStore } from './auth-store';
 
 // ── Reconnect persistence ──
@@ -63,6 +64,7 @@ interface OnlineGameState {
   instantWinResults: InstantWinResult[];
   showInstantWin: boolean;
   timer: number;
+  readyPlayers: string[];
   winner: string | null;
   winnerName: string | null;
   scores: Record<string, number> | null;
@@ -81,9 +83,11 @@ interface OnlineGameActions {
   startGame: () => void;
 
   // Game actions
+  arrangeHand: (mode: ArrangeMode) => void;
   playCards: (cardIds: string[]) => void;
   pass: () => void;
   declareInstantWin: () => void;
+  playerReady: () => void;
 
   // Reconnection
   reconnectToRoom: () => void;
@@ -113,6 +117,7 @@ const initialState: OnlineGameState = {
   instantWinResults: [],
   showInstantWin: false,
   timer: 30,
+  readyPlayers: [],
   winner: null,
   winnerName: null,
   scores: null,
@@ -227,6 +232,20 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
     });
   },
 
+  playerReady: () => {
+    const socket = getSocket();
+    const { roomCode } = get();
+    if (!socket) return;
+    socket.emit('player_ready', { roomCode }, (res: { ok?: boolean; error?: string }) => {
+      if (res.error) set({ error: res.error });
+    });
+  },
+
+  arrangeHand: (mode: ArrangeMode) => {
+    const { hand } = get();
+    set({ hand: sortHand(hand, mode) });
+  },
+
   listenToEvents: (token: string) => {
     const socket = connectSocket(token);
 
@@ -242,6 +261,7 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
     socket.off('new_round');
     socket.off('timer_sync');
     socket.off('player_disconnected');
+    socket.off('ready_state');
     socket.off('game_over');
     socket.off('error');
     socket.off('disconnect');
@@ -264,6 +284,19 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
         centralCard: data.centralCard,
         coinValue: data.coinValue,
         phase: 'ready-check',
+        // Clear previous game state
+        currentPlay: null,
+        currentPlayerId: null,
+        currentPlayerName: null,
+        roundHistory: [],
+        gameHistory: [],
+        winner: null,
+        winnerName: null,
+        scores: null,
+        payouts: null,
+        winDetail: null,
+        readyPlayers: [],
+        error: null,
       });
     });
 
@@ -325,6 +358,10 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
 
     socket.on('timer_sync', (data: { remaining: number }) => {
       set({ timer: data.remaining });
+    });
+
+    socket.on('ready_state', (data: { readyPlayers: string[] }) => {
+      set({ readyPlayers: data.readyPlayers });
     });
 
     socket.on('player_disconnected', (data: { playerId: string; playerName: string }) => {

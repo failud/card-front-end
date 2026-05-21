@@ -6,6 +6,7 @@ import { DndContext, useDroppable, DragOverlay, type DragStartEvent, type DragEn
 import { useAuthStore } from '@/stores/auth-store';
 import { useOnlineGameStore } from '@/stores/online-game-store';
 import { getSocket } from '@/lib/socket';
+import { useBeforeUnload } from '@/hooks/use-before-unload';
 import { useToastStore } from '@/stores/toast-store';
 import { PlayerHand, type PlayerHandHandle } from '@/components/game/player-hand';
 import { GameCard } from '@/components/game/card';
@@ -108,11 +109,12 @@ export default function OnlineGamePage({ params }: { params: Promise<{ code: str
   const toast = useToastStore((s) => s.show);
 
   const {
-    phase, roomCode, hand, opponents, centralCard,
+    phase, roomCode, hand, opponents, players, centralCard,
     currentPlayerId, currentPlayerName, currentPlay, gameHistory,
-    instantWinResults, showInstantWin, timer, winner, winnerName, payouts,
+    instantWinResults, showInstantWin, timer, readyPlayers, winner, winnerName, payouts,
     winDetail, coinValue, error,
     playCards: storePlayCards, pass: storePass, declareInstantWin, leaveRoom, reset, listenToEvents,
+    arrangeHand, playerReady,
   } = useOnlineGameStore();
 
   const [draggedCard, setDraggedCard] = useState<CardType | null>(null);
@@ -120,6 +122,9 @@ export default function OnlineGamePage({ params }: { params: Promise<{ code: str
   const handRef = useRef<PlayerHandHandle>(null);
 
   useEffect(() => { setMounted(true); }, []);
+
+  // Warn before leaving while in a game
+  useBeforeUnload(phase === 'playing' || phase === 'ready-check', roomCode);
 
   const isMyTurn = currentPlayerId !== null && currentPlayerId === userId;
 
@@ -131,9 +136,9 @@ export default function OnlineGamePage({ params }: { params: Promise<{ code: str
   useEffect(() => {
     if (!nickname || !token) { router.push('/'); return; }
 
-    if (!roomCode && code) {
-      listenToEvents(token);
+    listenToEvents(token);
 
+    if (!roomCode) {
       const doRejoin = () => {
         const socket = getSocket();
         if (!socket?.connected) return;
@@ -335,6 +340,7 @@ export default function OnlineGamePage({ params }: { params: Promise<{ code: str
               time={timer}
               onPlay={handlePlay}
               onPass={handlePass}
+              onArrange={arrangeHand}
             />
           )}
           {phase !== 'playing' && phase !== 'ready-check' && (
@@ -434,12 +440,36 @@ export default function OnlineGamePage({ params }: { params: Promise<{ code: str
                   })}
                 </div>
               )}
+              {/* Ready status — all players */}
+              <div className="bg-gray-800/50 rounded-lg p-3 mb-4">
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">{t('game.readyPlayers')}</p>
+                <div className="space-y-1.5">
+                  {players.map((p) => {
+                    const isReady = readyPlayers.includes(p.id);
+                    const isMe = p.id === userId;
+                    return (
+                      <div key={p.id} className="flex items-center justify-between text-sm">
+                        <span className={isReady ? 'text-green-400' : 'text-gray-400'}>
+                          {isMe ? t('common.you') : p.name}
+                        </span>
+                        <Badge className={isReady ? 'bg-green-600' : 'bg-gray-600'}>
+                          {isReady ? t('game.ready') : t('game.waitingReady')}
+                        </Badge>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
               <div className="flex gap-3">
                 <Button variant="outline" className="flex-1 border-gray-700 text-gray-300" onClick={handleLeave}>
                   {t('game.exitGame')}
                 </Button>
-                <Button className="flex-1 bg-red-600 hover:bg-red-700" onClick={handlePlayAgain}>
-                  {t('game.playAgain')}
+                <Button
+                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                  disabled={readyPlayers.includes(userId)}
+                  onClick={playerReady}
+                >
+                  {readyPlayers.includes(userId) ? t('game.waitingReady') : t('game.readyButton')}
                 </Button>
               </div>
             </div>
