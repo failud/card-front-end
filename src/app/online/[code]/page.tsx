@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { DndContext, useDroppable, DragOverlay, type DragStartEvent, type DragEndEvent } from '@dnd-kit/core';
 import { useAuthStore } from '@/stores/auth-store';
 import { useOnlineGameStore } from '@/stores/online-game-store';
+import { getSocket } from '@/lib/socket';
 import { useToastStore } from '@/stores/toast-store';
 import { PlayerHand, type PlayerHandHandle } from '@/components/game/player-hand';
 import { GameCard } from '@/components/game/card';
@@ -126,13 +127,32 @@ export default function OnlineGamePage({ params }: { params: Promise<{ code: str
   const otherOpponents = opponents.filter((o) => o.id !== userId);
   const gridCols = otherOpponents.length <= 2 ? 'grid-cols-2' : otherOpponents.length === 3 ? 'grid-cols-3' : 'grid-cols-1';
 
-  // Setup socket listeners
+  // Setup socket listeners and reconnect to room
   useEffect(() => {
     if (!nickname || !token) { router.push('/'); return; }
-    if (!roomCode) {
+
+    if (!roomCode && code) {
       listenToEvents(token);
+
+      const doRejoin = () => {
+        const socket = getSocket();
+        if (!socket?.connected) return;
+        socket.emit('join_room', { roomCode: code }, (res: { ok?: boolean; error?: string }) => {
+          if (res.error) {
+            router.push('/online');
+          }
+        });
+      };
+
+      const socket = getSocket();
+      if (socket?.connected) {
+        doRejoin();
+      } else {
+        socket?.on('connect', doRejoin);
+        return () => { socket?.off('connect', doRejoin); };
+      }
     }
-  }, [nickname, token, router, listenToEvents, roomCode]);
+  }, [nickname, token, router, listenToEvents, roomCode, code]);
 
   // Show error as toast
   useEffect(() => {

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useOnlineGameStore } from '@/stores/online-game-store';
+import { getSocket } from '@/lib/socket';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,8 +19,8 @@ export default function OnlinePage() {
   const { nickname, token } = useAuthStore();
   const { t } = useTranslations();
   const {
-    phase, roomCode, isHost, playerCount: storePlayerCount, players, error,
-    createRoom, joinRoom, leaveRoom, startGame, listenToEvents, setError,
+    phase, roomCode, isHost, playerCount: storePlayerCount, players, error, isReconnecting,
+    createRoom, joinRoom, leaveRoom, startGame, listenToEvents, setError, reconnectToRoom,
   } = useOnlineGameStore();
 
   const [showCreate, setShowCreate] = useState(false);
@@ -33,6 +34,16 @@ export default function OnlinePage() {
   useEffect(() => {
     if (!nickname) { router.push('/'); return; }
     listenToEvents(token);
+
+    // Try to reconnect to a previous room after connecting
+    const socket = getSocket();
+    if (socket?.connected) {
+      reconnectToRoom();
+    } else {
+      const onConnect = () => { reconnectToRoom(); };
+      socket?.on('connect', onConnect);
+      return () => { socket?.off('connect', onConnect); };
+    }
   }, [nickname, token, router, listenToEvents]);
 
   // Navigate to game when it starts

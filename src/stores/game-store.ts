@@ -8,25 +8,28 @@ import { calculateScore, calculatePayout } from '@/lib/scoring';
 import { aiDecide } from '@/lib/ai';
 import { CARDS_PER_PLAYER, AI_NAMES, INSTANT_WIN_POINTS } from '@/lib/constants';
 
-function shouldEndRound(roundHistory: PlayRecord[], activePlayers: Player[], currentPlay: PlayRecord): boolean {
+function shouldEndRound(players: Player[], currentPlay: PlayRecord | null, passedPlayerIds: Set<string>): boolean {
   if (!currentPlay || currentPlay.type === 'pass') return false;
-  const currentPlayIndex = roundHistory.indexOf(currentPlay);
-  if (currentPlayIndex === -1) return false;
-  const actionsAfterPlay = roundHistory.slice(currentPlayIndex + 1);
-  const passedPlayerIds = new Set(actionsAfterPlay.map((r) => r.playerId));
-  const others = activePlayers.filter((p) => p.id !== currentPlay.playerId && !p.lockedOut && !p.isOut);
 
-  if (others.length === 0) return false;
+  const leaderId = currentPlay.playerId;
 
-  const allOthersPassed = others.every((p) => passedPlayerIds.has(p.id));
-  if (!allOthersPassed) return false;
+  // All active players except the round leader must have passed
+  return players.every(
+    (p) => p.id === leaderId || p.lockedOut || p.isOut || passedPlayerIds.has(p.id),
+  );
+}
 
-  const totalActive = activePlayers.filter((p) => !p.lockedOut && !p.isOut).length;
-  if (totalActive === 2) {
-    return passedPlayerIds.has(currentPlay.playerId);
+function findNextPlayerIndex(currentIndex: number, players: Player[], passedPlayerIds: Set<string>): number {
+  const total = players.length;
+  let next = (currentIndex + 1) % total;
+  let tries = 0;
+  while (tries < total) {
+    const p = players[next];
+    if (!p.lockedOut && !p.isOut && !passedPlayerIds.has(p.id)) return next;
+    next = (next + 1) % total;
+    tries++;
   }
-
-  return true;
+  return next; // fallback (should not happen — round should have ended)
 }
 
 function buildWinDetail(
@@ -98,6 +101,7 @@ interface GameState {
   gameHistory: PlayRecord[];
   instantWinResults: InstantWinResult[];
   showInstantWin: boolean;
+  passedPlayerIds: string[];
   timer: number;
   winner: string | null;
   scores: Record<string, number> | null;
@@ -129,6 +133,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
   gameHistory: [],
   instantWinResults: [],
   showInstantWin: false,
+  passedPlayerIds: [],
   timer: 30,
   winner: null,
   scores: null,
@@ -184,6 +189,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
           gameHistory: [],
           instantWinResults: [],
           showInstantWin: false,
+          passedPlayerIds: [],
           timer: 30,
           winner: players[i].id,
           scores: { [players[i].id]: pts },
@@ -209,6 +215,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
       gameHistory: [],
       instantWinResults: humanInstantWins,
       showInstantWin: humanInstantWins.length > 0,
+      passedPlayerIds: [],
       timer: 30,
       winner: null,
       scores: null,
@@ -280,13 +287,14 @@ export const useGameStore = create<GameState>()((set, get) => ({
     }
 
     // Move to next player
-    const nextIndex = (currentPlayerIndex + 1) % players.length;
+    const nextIndex = findNextPlayerIndex(currentPlayerIndex, updatedPlayers, new Set());
     set({
       players: updatedPlayers,
       roundHistory: newRoundHistory,
       gameHistory: newGameHistory,
       currentPlay: record,
       leadingSuit: newLeadingSuit,
+      passedPlayerIds: [],
       currentPlayerIndex: nextIndex,
       timer: 30,
     });
@@ -295,37 +303,38 @@ export const useGameStore = create<GameState>()((set, get) => ({
   },
 
   pass: () => {
-    const { players, currentPlayerIndex, currentPlay, roundHistory, gameHistory } = get();
+    const { players, currentPlayerIndex, currentPlay, roundHistory, gameHistory, passedPlayerIds } = get();
     const player = players[currentPlayerIndex];
     if (player.isAI || player.lockedOut || player.isOut) return 'error_cannot_play';
     if (!currentPlay || currentPlay.type === 'pass') return 'error_cannot_pass';
 
+    const newPassedPlayerIds = [...passedPlayerIds, player.id];
     const record: PlayRecord = { playerId: player.id, cards: [], type: 'pass' };
-    const updatedPlayers = [...players];
-    const nextIndex = (currentPlayerIndex + 1) % players.length;
     const newRoundHistory = [...roundHistory, record];
     const newGameHistory = [...gameHistory, record];
 
-    if (shouldEndRound(newRoundHistory, players, currentPlay)) {
+    if (shouldEndRound(players, currentPlay, new Set(newPassedPlayerIds))) {
       const winnerIndex = players.findIndex((p) => p.id === currentPlay.playerId);
       set({
-        players: updatedPlayers,
         roundHistory: [],
         leadingSuit: null,
         currentPlay: null,
         currentPlayerIndex: winnerIndex,
         gameHistory: newGameHistory,
+        passedPlayerIds: [],
         timer: 30,
       });
       get().runAITurns();
       return;
     }
 
+    const nextIndex = findNextPlayerIndex(currentPlayerIndex, players, new Set(newPassedPlayerIds));
+
     set({
-      players: updatedPlayers,
       roundHistory: newRoundHistory,
       gameHistory: newGameHistory,
       currentPlayerIndex: nextIndex,
+      passedPlayerIds: newPassedPlayerIds,
       timer: 30,
     });
 
@@ -427,13 +436,14 @@ export const useGameStore = create<GameState>()((set, get) => ({
           return;
         }
 
-        const nextIndex = (currentPlayerIndex + 1) % updatedPlayers.length;
+        const nextIndex = findNextPlayerIndex(currentPlayerIndex, updatedPlayers, new Set());
         set({
           players: updatedPlayers,
           roundHistory: [...currentState.roundHistory, record],
           gameHistory: [...currentState.gameHistory, record],
           currentPlay: record,
           leadingSuit: newLeadingSuit,
+          passedPlayerIds: [],
           currentPlayerIndex: nextIndex,
           timer: 30,
         });
@@ -443,12 +453,12 @@ export const useGameStore = create<GameState>()((set, get) => ({
       } else {
         // AI passes
         const record: PlayRecord = { playerId: player.id, cards: [], type: 'pass' };
-        const nextIndex = (currentPlayerIndex + 1) % players.length;
+        const newPassedPlayerIds = [...(currentState.passedPlayerIds || []), player.id];
         const newRoundHistory = [...currentState.roundHistory, record];
         const newGameHistory = [...currentState.gameHistory, record];
 
         // Check if round should end: all others passed on current play
-        if (currentPlay && shouldEndRound(newRoundHistory, currentState.players, currentPlay)) {
+        if (currentPlay && shouldEndRound(currentState.players, currentPlay, new Set(newPassedPlayerIds))) {
           const winnerIndex = currentState.players.findIndex((p) => p.id === currentPlay.playerId);
           set({
             roundHistory: [],
@@ -456,16 +466,19 @@ export const useGameStore = create<GameState>()((set, get) => ({
             currentPlay: null,
             currentPlayerIndex: winnerIndex,
             gameHistory: newGameHistory,
+            passedPlayerIds: [],
             timer: 30,
           });
           get().runAITurns();
           return;
         }
 
+        const nextIndex = findNextPlayerIndex(currentPlayerIndex, currentState.players, new Set(newPassedPlayerIds));
         set({
           roundHistory: newRoundHistory,
           gameHistory: newGameHistory,
           currentPlayerIndex: nextIndex,
+          passedPlayerIds: newPassedPlayerIds,
         });
         get().runAITurns();
       }
@@ -489,6 +502,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
       gameHistory: [],
       instantWinResults: [],
       showInstantWin: false,
+      passedPlayerIds: [],
       timer: 30,
       winner: null,
       scores: null,

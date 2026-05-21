@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [localError, setLocalError] = useState('');
   const router = useRouter();
-  const { login, loading, error: apiError } = useAuthStore();
+  const { login, loading, error: apiError, isLoggedIn } = useAuthStore();
+
+  // Redirect to modes if already logged in (token persists across refresh)
+  useEffect(() => {
+    if (isLoggedIn) router.replace('/modes');
+  }, [isLoggedIn, router]);
   const { t } = useTranslations();
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -5,6 +5,29 @@ import { getSocket, connectSocket } from '@/lib/socket';
 import type { Card, PlayRecord, InstantWinResult, WinDetail } from '@/types';
 import { useAuthStore } from './auth-store';
 
+// ── Reconnect persistence ──
+
+const RECONNECT_KEY = 'koi-room-reconnect';
+
+interface ReconnectData {
+  roomCode: string;
+}
+
+function saveReconnectData(data: ReconnectData) {
+  try { sessionStorage.setItem(RECONNECT_KEY, JSON.stringify(data)); } catch {}
+}
+
+function loadReconnectData(): ReconnectData | null {
+  try {
+    const raw = sessionStorage.getItem(RECONNECT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function clearReconnectData() {
+  try { sessionStorage.removeItem(RECONNECT_KEY); } catch {}
+}
+
 // ── Room Types ──
 
 export interface RoomPlayer {
@@ -47,6 +70,7 @@ interface OnlineGameState {
   winDetail: WinDetail | null;
   coinValue: number;
   error: string | null;
+  isReconnecting: boolean;
 }
 
 interface OnlineGameActions {
@@ -60,6 +84,9 @@ interface OnlineGameActions {
   playCards: (cardIds: string[]) => void;
   pass: () => void;
   declareInstantWin: () => void;
+
+  // Reconnection
+  reconnectToRoom: () => void;
 
   // Internal
   listenToEvents: (token: string) => void;
@@ -93,6 +120,7 @@ const initialState: OnlineGameState = {
   winDetail: null,
   coinValue: 1,
   error: null,
+  isReconnecting: false,
 };
 
 const onlineGameStore = create<OnlineGameStore>((set, get) => ({
@@ -105,6 +133,7 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
       if (res.error) { set({ error: res.error }); return; }
       const { nickname, userId } = useAuthStore.getState();
       const rc = res.roomCode || '';
+      saveReconnectData({ roomCode: rc });
       set({
         roomCode: rc,
         isHost: true,
@@ -122,6 +151,7 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
       if (res.error) { set({ error: res.error }); return; }
       const { nickname, userId } = useAuthStore.getState();
       const rc = res.roomCode || roomCode.toUpperCase();
+      saveReconnectData({ roomCode: rc });
       set((s) => ({
         roomCode: rc,
         isHost: false,
@@ -136,7 +166,29 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
     const { roomCode } = get();
     const socket = getSocket();
     if (socket && roomCode) socket.emit('leave_room', { roomCode });
+    clearReconnectData();
     set({ ...initialState, phase: 'idle' });
+  },
+
+  reconnectToRoom: () => {
+    const data = loadReconnectData();
+    if (!data) return;
+
+    const { isReconnecting } = get();
+    if (isReconnecting) return;
+
+    const socket = getSocket();
+    if (!socket || !socket.connected) return;
+
+    set({ isReconnecting: true });
+    socket.emit('join_room', { roomCode: data.roomCode }, (res: { ok?: boolean; error?: string }) => {
+      if (res.error) {
+        clearReconnectData();
+        set({ isReconnecting: false, error: res.error });
+        return;
+      }
+      set({ isReconnecting: false });
+    });
   },
 
   startGame: () => {
