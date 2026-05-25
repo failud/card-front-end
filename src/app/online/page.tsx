@@ -63,7 +63,7 @@ export default function OnlinePage() {
   useEffect(() => { setMounted(true); }, []);
 
   // Warn before leaving while in a room
-  useBeforeUnload(phase === 'lobby' && !!roomCode, roomCode);
+  useBeforeUnload(phase === 'lobby' && !!roomCode);
 
   useEffect(() => {
     if (!nickname) { router.push('/'); return; }
