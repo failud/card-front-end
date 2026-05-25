@@ -152,7 +152,7 @@ export default function OnlinePage() {
                   Players: {localPlayerCount}
                 </label>
                 <div className="flex gap-2">
-                  {[3, 4].map((n) => (
+                  {[3, 4, 5].map((n) => (
                     <Button
                       key={n}
                       variant={localPlayerCount === n ? 'default' : 'outline'}

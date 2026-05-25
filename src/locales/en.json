@@ -121,6 +121,8 @@
     "summaryZeroPoint": "{name} won by playing all cards (Zero-Point Win) — {points} pts",
     "summaryNormal": "{name} won by playing all cards — {points} pts",
     "newRoundWaiting": "New round — waiting for player to start",
+    "opponentCardsHidden": "Cards hidden",
+    "winnerCards": "Winner Plays",
     "playerPlayed": "{name} played",
     "noPlaysThisRound": "No plays this round",
     "thisRound": "This round",

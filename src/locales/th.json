@@ -121,6 +121,8 @@
     "summaryZeroPoint": "{name} ชนะด้วยการเล่นจนหมดมือ (Zero-Point Win) — {points} แต้ม",
     "summaryNormal": "{name} ชนะด้วยการเล่นจนหมดมือ — {points} แต้ม",
     "newRoundWaiting": "รอบใหม่ — รอผู้เล่นเริ่ม",
+    "opponentCardsHidden": "ซ่อนการ์ด",
+    "winnerCards": "การ์ดผู้ชนะ",
     "playerPlayed": "{name} เล่น",
     "noPlaysThisRound": "ยังไม่มีการเล่นในรอบนี้",
     "thisRound": "รอบนี้",

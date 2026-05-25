@@ -104,7 +104,7 @@ export default function ModesPage() {
                       }
                       onClick={() => setOpponentCount(n)}
                     >
-                      {t('modes.playerCount', { count: n + 1 })}
+                      {n + 1}
                     </Button>
                   ))}
                 </div>

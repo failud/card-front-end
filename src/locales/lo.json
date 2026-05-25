@@ -121,6 +121,8 @@
     "summaryZeroPoint": "{name} ຊະນະດ້ວຍການຫຼິ້ນຈົນໝົດມື (Zero-Point Win) — {points} ຄະແນນ",
     "summaryNormal": "{name} ຊະນະດ້ວຍການຫຼິ້ນຈົນໝົດມື — {points} ຄະແນນ",
     "newRoundWaiting": "ຮອບໃໝ່ — ລໍຖ້າຜູ້ຫຼິ້ນເລີ່ມ",
+    "opponentCardsHidden": "ເຊື່ອງກາດ",
+    "winnerCards": "ກາດຜູ້ຊະນະ",
     "playerPlayed": "{name} ຫຼິ້ນ",
     "noPlaysThisRound": "ຍັງບໍ່ມີການຫຼິ້ນໃນຮອບນີ້",
     "thisRound": "ຮອບນີ້",
