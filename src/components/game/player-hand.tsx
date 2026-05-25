@@ -146,11 +146,28 @@ export const PlayerHand = forwardRef<PlayerHandHandle, PlayerHandProps>(function
 
   return (
     <div className="space-y-3 ">
-      {/* Grid: left (arrange) | center (timer) | right (pass/play) */}
-      <div className="grid grid-cols-3 items-center gap-2">
-        {/* Left: Arrange buttons */}
-        <div className="flex items-center gap-1 flex-wrap">
-          {onArrange ? (
+      {/* Arrange buttons — separate row on mobile, part of grid on desktop */}
+      {onArrange && (
+        <div className="flex sm:hidden items-center gap-0.5 flex-wrap justify-center">
+          {arrangeModes.map(({ mode, labelKey }) => (
+            <Button
+              key={mode}
+              variant="outline"
+              size="sm"
+              className="border-gray-700 text-gray-300 hover:bg-gray-800 text-[10px] h-9 px-2"
+              onClick={() => onArrange(mode)}
+            >
+              {t(labelKey)}
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {/* Controls: left (arrange) | center (timer) | right (pass/play) */}
+      <div className="grid grid-cols-[auto_1fr_auto] sm:grid-cols-3 items-center gap-1 sm:gap-2">
+        {/* Left: Arrange buttons (desktop only) */}
+        <div className="hidden sm:flex items-center gap-1 flex-wrap">
+          {onArrange && (
             <>
               <span className="text-xs text-gray-500 mr-0.5">{t('game.arrange')}</span>
               {arrangeModes.map(({ mode, labelKey }) => (
@@ -165,8 +182,6 @@ export const PlayerHand = forwardRef<PlayerHandHandle, PlayerHandProps>(function
                 </Button>
               ))}
             </>
-          ) : (
-            <span /> /* empty left cell to keep grid alignment */
           )}
         </div>
 
@@ -175,7 +190,7 @@ export const PlayerHand = forwardRef<PlayerHandHandle, PlayerHandProps>(function
           {isMyTurn && (
             <div className="flex flex-col items-center gap-0.5">
               <div
-                className="w-40 h-2 bg-gray-700 rounded-full overflow-hidden"
+                className="w-28 sm:w-40 h-1.5 sm:h-2 bg-gray-700 rounded-full overflow-hidden"
                 style={{
                   animation: time <= 5 ? 'timer-wave 0.8s ease-in-out infinite, timer-glow 0.8s ease-in-out infinite' : 'none',
                 }}
@@ -189,7 +204,7 @@ export const PlayerHand = forwardRef<PlayerHandHandle, PlayerHandProps>(function
                 />
               </div>
               <span
-                className="text-[11px] font-bold"
+                className="text-[10px] sm:text-[11px] font-bold"
                 style={{
                   color: time <= 5 ? '#ef4444' : time <= 10 ? '#f59e0b' : '#22c55e',
                   animation: time <= 5 ? 'timer-wave 0.8s ease-in-out infinite' : 'none',
@@ -202,13 +217,13 @@ export const PlayerHand = forwardRef<PlayerHandHandle, PlayerHandProps>(function
         </div>
 
         {/* Right: Pass/Play buttons */}
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-1 sm:gap-2">
           {isMyTurn && (
             <>
               {currentPlay && currentPlay.type !== 'pass' ? (
                 <Button
                   variant="outline"
-                  className="border-gray-700 text-gray-300 hover:bg-gray-800 h-10 w-20 text-lg font-bold rounded-xl"
+                  className="border-gray-700 text-gray-300 hover:bg-gray-800 h-11 sm:h-10 w-16 sm:w-20 text-base sm:text-lg font-bold rounded-xl"
                   onClick={() => {
                     const err = pass();
                     if (err) toast(errorMessages[err] || err);
@@ -217,10 +232,10 @@ export const PlayerHand = forwardRef<PlayerHandHandle, PlayerHandProps>(function
                   {t('game.pass')}
                 </Button>
               ) : (
-                <span className="text-xs text-yellow-500 self-center">{t('game.leadPrompt')}</span>
+                <span className="text-[10px] sm:text-xs text-yellow-500 self-center">{t('game.leadPrompt')}</span>
               )}
               <Button
-                className="bg-red-600 hover:bg-red-700 h-10 w-20 text-lg font-bold rounded-xl"
+                className="bg-red-600 hover:bg-red-700 h-11 sm:h-10 w-16 sm:w-20 text-base sm:text-lg font-bold rounded-xl"
                 disabled={!canPlay}
                 onClick={handlePlay}
               >

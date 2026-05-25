@@ -4,7 +4,7 @@ interface CardBackProps {
 }
 
 export function CardBack({ count, size = 'md' }: CardBackProps) {
-  const dims = size === 'sm' ? 'w-8 h-12' : 'w-12 h-18';
+  const dims = size === 'sm' ? 'w-7 sm:w-8 h-10 sm:h-12' : 'w-10 sm:w-12 h-14 sm:h-18';
   return (
     <div className={`${dims} relative`}>
       <div className="w-full h-full bg-red-800 rounded-lg border-2 border-red-600 shadow-md flex items-center justify-center">

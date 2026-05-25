@@ -19,7 +19,7 @@ export function Topbar() {
   const isLoginPage = pathname === '/';
 
   return (
-    <header className="sticky top-0 z-30 h-14 border-b border-gray-800 bg-gray-950/80 backdrop-blur flex items-center justify-between px-4">
+    <div className="sticky top-0 z-30 h-14 border-b border-gray-800 flex items-center justify-between px-4 bg-gray-950/80 backdrop-blur">
       <div className="flex items-center gap-3">
         {!isLoginPage && (
           <Button
@@ -50,6 +50,6 @@ export function Topbar() {
           {mounted ? (theme === 'dark' ? '☀️' : '🌙') : '☀️'}
         </Button>
       </div>
-    </header>
+    </div>
   );
 }

@@ -8,6 +8,7 @@ import { useOnlineGameStore } from '@/stores/online-game-store';
 import { getSocket } from '@/lib/socket';
 import { useBeforeUnload } from '@/hooks/use-before-unload';
 import { useToastStore } from '@/stores/toast-store';
+import { useViewportStore } from '@/stores/viewport-store';
 import { PlayerHand, type PlayerHandHandle } from '@/components/game/player-hand';
 import { GameCard } from '@/components/game/card';
 import { CardBack } from '@/components/game/card-back';
@@ -23,19 +24,19 @@ import type { Card as CardType, PlayRecord } from '@/types';
 /* ── Fanned card backs for opponent hand ── */
 function FannedCardBacks({ count, maxFan = 5 }: { count: number; maxFan?: number }) {
   const displayCount = Math.min(count, maxFan);
-  const width = 24 + displayCount * 20;
+  const width = 20 + displayCount * 14;
   return (
-    <div className="relative flex items-end justify-center" style={{ width, height: 80 }}>
+    <div className="relative flex items-end justify-center" style={{ width, height: 50 }}>
       {Array.from({ length: displayCount }).map((_, i) => {
         const offset = i - (displayCount - 1) / 2;
-        const rotate = offset * 6;
-        const lift = Math.abs(offset) * 4;
+        const rotate = offset * 5;
+        const lift = Math.abs(offset) * 3;
         return (
           <div
             key={i}
             className="absolute bottom-0"
             style={{
-              left: `calc(50% + ${offset * 16}px)`,
+              left: `calc(50% + ${offset * 13}px)`,
               transform: `translateX(-50%) rotate(${rotate}deg)`,
               marginBottom: `${lift}px`,
               zIndex: i,
@@ -68,21 +69,21 @@ function OpponentCard({ name, handSize, isActive, history, t }: {
   return (
     <div
       className={cn(
-        'flex flex-col items-center gap-1 bg-gray-900/70 border rounded-xl p-3 min-w-30 transition-colors',
+        'flex flex-col items-center gap-1 bg-gray-900/70 border rounded-xl p-1.5 sm:p-3 min-w-0 sm:min-w-[120px] transition-colors',
         isActive ? 'border-yellow-500/50 bg-yellow-500/5' : 'border-gray-700/50',
       )}
     >
       <FannedCardBacks count={handSize} />
       <p className={cn(
-        'text-xs font-medium text-center truncate max-w-25 text-white',
+        'text-[10px] sm:text-xs font-medium text-center truncate max-w-[72px] sm:max-w-[100px] text-white',
         isActive && 'text-yellow-400',
       )}>
         {name}
       </p>
       <div className="flex gap-1 justify-center">
-        {isActive && <span className="text-[10px] text-yellow-400 animate-pulse">{t('game.thinking')}</span>}
+        {isActive && <span className="text-[9px] text-yellow-400 animate-pulse">{t('game.thinking')}</span>}
       </div>
-      <span className="text-[10px] text-gray-500">{handSize} {t('common.cards')}</span>
+      <span className="text-[9px] text-gray-500">{handSize} {t('common.cards')}</span>
       <PlayedCards records={history} fanned />
     </div>
   );
@@ -120,6 +121,9 @@ export default function OnlineGamePage({ params }: { params: Promise<{ code: str
   const [draggedCard, setDraggedCard] = useState<CardType | null>(null);
   const [mounted, setMounted] = useState(false);
   const handRef = useRef<PlayerHandHandle>(null);
+  const isMobile = useViewportStore((s) => s.isMobile);
+  const isLandscape = useViewportStore((s) => s.isLandscape);
+  const compact = isMobile && isLandscape;
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -130,7 +134,11 @@ export default function OnlineGamePage({ params }: { params: Promise<{ code: str
 
   // Filter opponents (exclude self)
   const otherOpponents = opponents.filter((o) => o.id !== userId);
-  const gridCols = otherOpponents.length <= 2 ? 'grid-cols-2' : otherOpponents.length === 3 ? 'grid-cols-3' : 'grid-cols-1';
+  const gridCols = otherOpponents.length <= 2
+    ? 'grid-cols-2'
+    : otherOpponents.length === 3
+      ? 'grid-cols-2 sm:grid-cols-3'
+      : 'grid-cols-2 sm:grid-cols-4';
 
   // Setup socket listeners and reconnect to room
   useEffect(() => {
@@ -173,6 +181,25 @@ export default function OnlineGamePage({ params }: { params: Promise<{ code: str
   const handlePass = useCallback(() => {
     storePass();
   }, [storePass]);
+
+  // Auto-pass when timer expires
+  const autoPassedRef = useRef(false);
+  useEffect(() => {
+    if (isMyTurn && phase === 'playing' && timer <= 0) {
+      if (!autoPassedRef.current) {
+        autoPassedRef.current = true;
+        storePass();
+      }
+    }
+    // Reset when turn changes or timer resets
+    if (timer > 0) {
+      autoPassedRef.current = false;
+    }
+  }, [timer, isMyTurn, phase, storePass]);
+  // Reset on new turn
+  useEffect(() => {
+    autoPassedRef.current = false;
+  }, [currentPlayerId]);
 
   const handleInstantWin = () => {
     declareInstantWin();
@@ -218,11 +245,11 @@ export default function OnlineGamePage({ params }: { params: Promise<{ code: str
     >
       <div className="min-h-[calc(100vh-3.5rem)] flex flex-col bg-green-950">
         {/* ======== TABLE AREA ======== */}
-        <div className="flex-1 relative mx-2 mt-2 mb-0">
+        <div className="flex-1 relative mx-1 sm:mx-2 mt-1 sm:mt-2 mb-0">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(34,197,94,0.15),transparent_70%)] pointer-events-none" />
 
           {/* ── Opponents grid at top ── */}
-          <div className={`absolute top-0 left-0 right-0 z-20 grid ${gridCols} gap-3 p-4 justify-items-center`}>
+          <div className={`absolute top-0 left-0 right-0 z-20 grid ${gridCols} ${compact ? 'gap-1 p-1' : 'gap-2 sm:gap-3 p-2 sm:p-4'} justify-items-center`}>
             {otherOpponents.map((opp) => {
               const isActive = currentPlayerId === opp.id && phase === 'playing';
               const playerHistory = gameHistory.filter((r) => r.playerId === opp.id);
@@ -242,9 +269,9 @@ export default function OnlineGamePage({ params }: { params: Promise<{ code: str
           {/* ── Center: Current Play + Central Card + Turn badge ── */}
           <PlayDropZone isHumanTurn={isMyTurn} />
           <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-            <div className="flex flex-col items-center gap-3">
+            <div className={`flex flex-col items-center ${compact ? 'gap-1' : 'gap-3'}`}>
               {centralCard && (
-                <div className="flex flex-col items-center gap-0.5">
+                <div className={`flex flex-col items-center ${compact ? 'gap-0' : 'gap-0.5'}`}>
                   <span className="text-[9px] text-yellow-400/70">{t('game.central')}</span>
                   <div className="w-10 h-14 bg-white rounded-lg border-2 border-yellow-500 flex flex-col items-center justify-center shadow-lg text-xs font-bold">
                     <span className={centralCard.color === 'red' ? 'text-red-500' : 'text-black'}>{centralCard.rank}</span>
@@ -281,16 +308,16 @@ export default function OnlineGamePage({ params }: { params: Promise<{ code: str
           </div>
 
           {/* ── Current player seat at bottom ── */}
-          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-0.5 bg-black/50 px-2 py-0.5 rounded">
-            <p className="text-[11px] font-medium text-white whitespace-nowrap">{nickname} ({t('common.you')})</p>
-            <p className="text-[10px] text-green-400">{hand.length} {t('common.cards')}</p>
-            <PlayedCards records={gameHistory.filter((r) => r.playerId === userId)} />
+          <div className={`absolute -bottom-1 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center bg-black/50 rounded ${compact ? 'gap-0 px-1.5 py-0' : 'gap-0.5 px-2 py-0.5'}`}>
+            <p className={`font-medium text-white whitespace-nowrap ${compact ? 'text-[10px]' : 'text-[11px]'}`}>{nickname} ({t('common.you')})</p>
+            <p className={`text-green-400 ${compact ? 'text-[9px]' : 'text-[10px]'}`}>{hand.length} {t('common.cards')}</p>
+            {!compact && <PlayedCards records={gameHistory.filter((r) => r.playerId === userId)} />}
           </div>
 
           {/* ── Ready Check overlay ── */}
           {(phase === 'ready-check' || isInstantWinReady) && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 rounded-[45%]">
-              <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-sm w-full mx-4">
+              <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 max-w-sm w-full mx-2 sm:mx-4 max-h-[85vh] overflow-y-auto">
                 {isInstantWinReady ? (
                   <>
                     <h2 className="text-xl font-bold text-white mb-3">{t('game.instantWinTitle')}</h2>
@@ -329,7 +356,7 @@ export default function OnlineGamePage({ params }: { params: Promise<{ code: str
         </div>
 
         {/* ======== BOTTOM: Hand + Controls ======== */}
-        <div className="bg-black/50 backdrop-blur border-t border-green-900/50 p-3">
+        <div className={`bg-black/50 backdrop-blur border-t border-green-900/50 ${compact ? 'p-1' : 'p-2 sm:p-3'}`}>
           {(phase === 'playing' || phase === 'ready-check') && (
             <PlayerHand
               ref={handRef}
@@ -350,8 +377,8 @@ export default function OnlineGamePage({ params }: { params: Promise<{ code: str
 
         {/* ======== Game Over Dialog ======== */}
         {phase === 'game-over' && winDetail && (
-          <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-sm w-full my-8">
+          <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+            <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 max-w-sm w-full my-4 sm:my-8 max-h-[90vh] overflow-y-auto">
               <div className="text-center mb-4">
                 <h2 className="text-xl font-bold text-white mb-1">
                   {winner === userId ? t('game.youWon') : t('game.youLost')}

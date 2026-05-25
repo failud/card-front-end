@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { create } from 'zustand';
 import { getSocket, connectSocket } from '@/lib/socket';
@@ -330,6 +330,8 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
 
     socket.on('play_made', (data: { playerId: string; playerName: string; cards: Card[]; type: string }) => {
       const record: PlayRecord = { playerId: data.playerId, cards: data.cards, type: data.type as PlayRecord['type'] };
+      const myId = useAuthStore.getState().userId;
+      const playedIds = new Set(data.cards.map((c) => c.id));
       set((s) => ({
         currentPlay: record,
         roundHistory: [...s.roundHistory, record],
@@ -338,6 +340,8 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
         opponents: s.opponents.map((o) =>
           o.id === data.playerId ? { ...o, handSize: Math.max(0, o.handSize - data.cards.length) } : o
         ),
+        // Remove played cards from own hand
+        hand: data.playerId === myId ? s.hand.filter((c) => !playedIds.has(c.id)) : s.hand,
       }));
     });
 

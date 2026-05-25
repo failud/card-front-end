@@ -75,10 +75,10 @@ export default function OnlinePage() {
   if (!nickname) return null;
 
   const renderLobby = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-white">
+          <h2 className="text-lg sm:text-xl font-bold text-white">
             Room: <span className="text-red-400">{roomCode}</span>
           </h2>
           <p className="text-gray-400 text-sm">
@@ -88,14 +88,14 @@ export default function OnlinePage() {
         <div className="flex gap-2">
           <Button
             variant="outline"
-            className="border-gray-700 text-gray-300 hover:bg-gray-800"
+            className="border-gray-700 text-gray-300 hover:bg-gray-800 text-sm h-9 sm:h-10"
             onClick={handleLeave}
           >
             {t('common.back')}
           </Button>
           {isHost && (
             <Button
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600 hover:bg-red-700 text-sm h-9 sm:h-10"
               disabled={players.length < 3}
               onClick={startGame}
             >
@@ -105,30 +105,31 @@ export default function OnlinePage() {
         </div>
       </div>
 
-      <div className="space-y-2">
-        <p className="text-sm text-gray-500 uppercase">Players</p>
+      <div className="max-h-[35vh] sm:max-h-[45vh] overflow-y-auto space-y-2 -mx-1 px-1">
+        <p className="text-sm text-gray-500 uppercase sticky top-0 bg-gray-950 pb-1">Players</p>
         {players.map((p, i) => (
-          <div key={p.id} className="flex items-center gap-3 py-2 px-3 rounded bg-gray-800/50">
-            <span className="text-gray-400 text-sm w-6">{i + 1}.</span>
-            <span className="text-white flex-1">{p.name}</span>
+          <div key={p.id} className="flex items-center gap-2 sm:gap-3 py-2 px-3 rounded bg-gray-800/50">
+            <span className="text-gray-400 text-sm w-5 sm:w-6">{i + 1}.</span>
+            <span className="text-white text-sm sm:text-base flex-1 truncate">{p.name}</span>
             {p.id === players[0]?.id && (
-              <Badge className="bg-yellow-600/50 text-yellow-200 text-xs">Host</Badge>
+              <Badge className="bg-yellow-600/50 text-yellow-200 text-xs shrink-0">Host</Badge>
             )}
             {!p.connected && (
-              <Badge className="bg-red-600/50 text-red-200 text-xs">Disconnected</Badge>
+              <Badge className="bg-red-600/50 text-red-200 text-xs shrink-0">Disconnected</Badge>
             )}
           </div>
         ))}
         {Array.from({ length: Math.max(0, storePlayerCount - players.length) }).map((_, i) => (
-          <div key={`waiting-${i}`} className="flex items-center gap-3 py-2 px-3 rounded bg-gray-800/20 border border-dashed border-gray-700">
-            <span className="text-gray-600 text-sm w-6">{players.length + i + 1}.</span>
-            <span className="text-gray-600">Waiting for player...</span>
+          <div key={`waiting-${i}`} className="flex items-center gap-2 sm:gap-3 py-2 px-3 rounded bg-gray-800/20 border border-dashed border-gray-700">
+            <span className="text-gray-600 text-sm w-5 sm:w-6">{players.length + i + 1}.</span>
+            <span className="text-gray-600 text-sm">Waiting for player...</span>
           </div>
         ))}
       </div>
 
-      <p className="text-gray-500 text-sm text-center">
-        Share this code: <span className="text-white font-bold tracking-widest text-lg">{roomCode}</span>
+      <p className="text-gray-500 text-xs sm:text-sm text-center">
+        Share this code:{' '}
+        <span className="text-white font-bold tracking-widest text-base sm:text-lg">{roomCode}</span>
       </p>
     </div>
   );
@@ -137,13 +138,13 @@ export default function OnlinePage() {
     <div className="grid gap-4 sm:grid-cols-2 max-w-xl mx-auto">
       {/* Create Room */}
       <Card className="bg-gray-900 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white text-lg">Create Room</CardTitle>
-          <CardDescription className="text-gray-400">
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-white text-base sm:text-lg">Create Room</CardTitle>
+          <CardDescription className="text-gray-400 text-xs sm:text-sm">
             Create a new game room and share the code
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 px-4 pb-4 sm:px-6 sm:pb-6">
           {showCreate ? (
             <>
               <div>
@@ -156,8 +157,8 @@ export default function OnlinePage() {
                       key={n}
                       variant={localPlayerCount === n ? 'default' : 'outline'}
                       className={localPlayerCount === n
-                        ? 'bg-red-600 hover:bg-red-700'
-                        : 'border-gray-700 text-gray-300 hover:bg-gray-800'}
+                        ? 'bg-red-600 hover:bg-red-700 h-9 sm:h-10 flex-1'
+                        : 'border-gray-700 text-gray-300 hover:bg-gray-800 h-9 sm:h-10 flex-1'}
                       onClick={() => setLocalPlayerCount(n)}
                     >
                       {n}
@@ -167,15 +168,15 @@ export default function OnlinePage() {
               </div>
               <div>
                 <label className="text-sm text-gray-300 block mb-2">Bet Level</label>
-                <div className="grid grid-cols-4 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                   {COIN_LEVELS.map((level, i) => (
                     <Button
                       key={i}
                       variant={coinLevel === i ? 'default' : 'outline'}
                       size="sm"
                       className={coinLevel === i
-                        ? 'bg-red-600 hover:bg-red-700 text-xs'
-                        : 'border-gray-700 text-gray-300 hover:bg-gray-800 text-xs'}
+                        ? 'bg-red-600 hover:bg-red-700 text-xs h-9 sm:h-8'
+                        : 'border-gray-700 text-gray-300 hover:bg-gray-800 text-xs h-9 sm:h-8'}
                       onClick={() => setCoinLevel(i)}
                     >
                       {t(`coinLevels.${COIN_LEVEL_KEYS[i]}`)}
@@ -186,13 +187,13 @@ export default function OnlinePage() {
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  className="flex-1 border-gray-700 text-gray-300 hover:bg-gray-800"
+                  className="flex-1 border-gray-700 text-gray-300 hover:bg-gray-800 h-9 sm:h-10"
                   onClick={() => setShowCreate(false)}
                 >
                   {t('common.cancel')}
                 </Button>
                 <Button
-                  className="flex-1 bg-red-600 hover:bg-red-700"
+                  className="flex-1 bg-red-600 hover:bg-red-700 h-9 sm:h-10"
                   onClick={handleCreateRoom}
                 >
                   Create
@@ -200,7 +201,7 @@ export default function OnlinePage() {
               </div>
             </>
           ) : (
-            <Button className="w-full bg-red-600 hover:bg-red-700" onClick={() => setShowCreate(true)}>
+            <Button className="w-full bg-red-600 hover:bg-red-700 h-10 sm:h-11" onClick={() => setShowCreate(true)}>
               Create New Room
             </Button>
           )}
@@ -209,22 +210,22 @@ export default function OnlinePage() {
 
       {/* Join Room */}
       <Card className="bg-gray-900 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white text-lg">Join Room</CardTitle>
-          <CardDescription className="text-gray-400">
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-white text-base sm:text-lg">Join Room</CardTitle>
+          <CardDescription className="text-gray-400 text-xs sm:text-sm">
             Enter a room code to join an existing game
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 px-4 pb-4 sm:px-6 sm:pb-6">
           <Input
             placeholder="Enter room code (e.g. ABC123)"
             value={joinCode}
             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
             maxLength={6}
-            className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 h-11 text-center tracking-widest text-lg"
+            className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 h-11 text-center tracking-widest text-base sm:text-lg"
           />
           <Button
-            className="w-full bg-red-600 hover:bg-red-700"
+            className="w-full bg-red-600 hover:bg-red-700 h-10 sm:h-11"
             disabled={joinCode.trim().length < 4}
             onClick={handleJoinRoom}
           >
@@ -236,10 +237,10 @@ export default function OnlinePage() {
   );
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] p-6">
+    <div className="min-h-[calc(100vh-3.5rem)] p-4 sm:p-6">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold text-white mb-2">Online Multiplayer</h1>
-        <p className="text-gray-400 mb-8">Play Koi with real players in real-time</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-white mb-1 sm:mb-2">Online Multiplayer</h1>
+        <p className="text-sm text-gray-400 mb-6 sm:mb-8">Play Koi with real players in real-time</p>
 
         {error && (
           <div className="mb-4 p-3 rounded bg-red-600/20 border border-red-600/30 text-red-300 text-sm">

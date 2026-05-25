@@ -18,6 +18,7 @@ import { SUIT_SYMBOLS } from '@/types';
 import { cn } from '@/lib/utils';
 import { useTranslations } from '@/lib/i18n';
 import { saveGame } from '@/lib/api';
+import { useViewportStore } from '@/stores/viewport-store';
 import type { Player, Card as CardType } from '@/types';
 
 /* ── fanned card backs for opponent hand ── */
@@ -123,6 +124,9 @@ export default function GamePage() {
 
   const handRef = useRef<PlayerHandHandle>(null);
   const [draggedCard, setDraggedCard] = useState<CardType | null>(null);
+  const isMobile = useViewportStore((s) => s.isMobile);
+  const isLandscape = useViewportStore((s) => s.isLandscape);
+  const compact = isMobile && isLandscape;
 
   const humanPlayer = players[0];
   const opponents = players.slice(1);
@@ -195,7 +199,7 @@ export default function GamePage() {
         {/* </div> */}
 
         {/* ── Opponents grid opposite main player ── */}
-        <div className={`absolute top-0 left-0 right-0 z-20 grid ${gridCols} gap-3 p-4 justify-items-center`}>
+        <div className={`absolute top-0 left-0 right-0 z-20 grid ${gridCols} ${compact ? 'gap-1 p-1' : 'gap-3 p-4'} justify-items-center`}>
           {opponents.map((opp, i) => {
             const isActive = currentPlayerIndex === i + 1 && !opp.lockedOut && !opp.isOut && phase === 'playing';
             const playerHistory = gameHistory.filter(r => r.playerId === opp.id);
@@ -206,9 +210,9 @@ export default function GamePage() {
         {/* ── Center: Current Play + Central Card + Turn badge ── */}
         <PlayDropZone isHumanTurn={isHumanTurn} />
         <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-          <div className="flex flex-col items-center gap-3">
+          <div className={`flex flex-col items-center ${compact ? 'gap-1' : 'gap-3'}`}>
             {centralCard && (
-              <div className="flex flex-col items-center gap-0.5">
+              <div className={`flex flex-col items-center ${compact ? 'gap-0' : 'gap-0.5'}`}>
                 <span className="text-[9px] text-yellow-400/70">{t('game.central')}</span>
                 <div className="w-10 h-14 bg-white rounded-lg border-2 border-yellow-500 flex flex-col items-center justify-center shadow-lg text-xs font-bold">
                   <span className={centralCard.color === 'red' ? 'text-red-500' : 'text-black'}>{centralCard.rank}</span>
@@ -249,10 +253,10 @@ export default function GamePage() {
         </div>
 
         {/* ── Human player seat at bottom of table ── */}
-        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-0.5 bg-black/50 px-2 py-0.5 rounded">
-          <p className="text-[11px] font-medium text-white whitespace-nowrap">{humanPlayer?.name} ({t('common.you')})</p>
-          <p className="text-[10px] text-green-400">{humanPlayer?.hand.length} {t('common.cards')}</p>
-          <PlayedCards records={gameHistory.filter(r => r.playerId === humanPlayer?.id)} />
+        <div className={`absolute -bottom-1 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center bg-black/50 rounded ${compact ? 'gap-0 px-1.5 py-0' : 'gap-0.5 px-2 py-0.5'}`}>
+          <p className={`font-medium text-white whitespace-nowrap ${compact ? 'text-[10px]' : 'text-[11px]'}`}>{humanPlayer?.name} ({t('common.you')})</p>
+          <p className={`text-green-400 ${compact ? 'text-[9px]' : 'text-[10px]'}`}>{humanPlayer?.hand.length} {t('common.cards')}</p>
+          {!compact && <PlayedCards records={gameHistory.filter(r => r.playerId === humanPlayer?.id)} />}
         </div>
 
         {/* ── Ready Check overlay (inside table area, doesn't cover hand) ── */}
@@ -298,7 +302,7 @@ export default function GamePage() {
       </div>
 
       {/* ======== BOTTOM: Hand + Timer + Controls ======== */}
-      <div className="bg-black/50 backdrop-blur border-t border-green-900/50 p-3">
+      <div className={`bg-black/50 backdrop-blur border-t border-green-900/50 ${compact ? 'p-1' : 'p-3'}`}>
         {/* Player hand — visible during ready-check too so player can see cards */}
         {(phase === 'playing' || phase === 'ready-check') && humanPlayer && (
           <PlayerHand

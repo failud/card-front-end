@@ -5,7 +5,7 @@ import type { Card as CardType } from '@/types';
 
 const MiniCard = ({ card, delay = 0 }: { card: CardType; delay?: number }) => (
   <div
-    className="w-11 h-16 bg-white rounded-lg flex flex-col items-center justify-center text-black shadow leading-none font-bold text-2xl"
+    className="w-9 h-14 sm:w-11 sm:h-16 bg-white rounded-lg flex flex-col items-center justify-center text-black shadow leading-none font-bold text-lg sm:text-2xl"
     style={{
       animation: `card-deal 0.35s ease-out ${delay}ms both`,
     }}
@@ -26,7 +26,7 @@ export function PlayedCards({ records, fanned = false }: { records: { cards: Car
           const cards = record.cards;
           const angle = (i * 4 - (playRecords.length - 1) * 2);
           return (
-            <div key={i} className="relative" style={{ width: 44, height: 64, transform: `rotate(${angle}deg)` }}>
+            <div key={i} className="relative w-9 h-14 sm:w-11 sm:h-16" style={{ transform: `rotate(${angle}deg)` }}>
               {cards.map((card, j) => (
                 <div
                   key={card.id}
