@@ -9,8 +9,10 @@ import { useTranslations } from '@/lib/i18n';
 import * as api from '@/lib/api';
 import type { GameHistoryItem } from '@/lib/api';
 
-function GameCard({ history, t }: { history: GameHistoryItem; t: (key: string, params?: Record<string, string | number>) => string }) {
-  const isWin = history.winnerId === 'player';
+function GameCard({ history, userId, t }: { history: GameHistoryItem; userId: string; t: (key: string, params?: Record<string, string | number>) => string }) {
+  const [open, setOpen] = useState(false);
+  const isWin = history.winnerId === userId;
+  const isAI = history.players.some((p) => p.isAI);
   const date = new Date(history.playedAt).toLocaleDateString(undefined, {
     year: 'numeric', month: 'short', day: 'numeric',
   });
@@ -18,52 +20,80 @@ function GameCard({ history, t }: { history: GameHistoryItem; t: (key: string, p
     hour: '2-digit', minute: '2-digit',
   });
 
+  const myPayout: number | undefined = history.payouts?.[userId] ?? history.payouts?.['player'];
+  const sortedPlayers = [...history.players].sort((a, b) => {
+    const pa = history.payouts?.[a.id] ?? 0;
+    const pb = history.payouts?.[b.id] ?? 0;
+    return pb - pa;
+  });
+
   return (
     <Card className="bg-gray-900 border-gray-800">
-      <CardHeader className="pb-2 flex flex-row items-start justify-between">
-        <div>
-          <CardTitle className="text-white text-base">
-            {t('history.gameVsAi', { count: history.opponentCount })}
-          </CardTitle>
-          <p className="text-xs text-gray-500 mt-0.5">{date} {time}</p>
-        </div>
-        <Badge className={isWin ? 'bg-green-600' : 'bg-red-600'}>
-          {isWin ? t('history.won') : t('history.lost')}
-        </Badge>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-wrap gap-4 text-sm">
-          <span className="text-gray-400">
-            {t('history.winType')}: <span className="text-white">
-              {history.winType === 'instant_win' ? t('game.instantWin') : t('game.normalWin')}
-            </span>
-          </span>
-          <span className="text-gray-400">
-            {t('game.totalPoints')}: <span className="text-white">{history.totalPoints}</span>
-          </span>
-          <span className="text-gray-400">
-            {t('history.coinValue')}: <span className="text-white">{history.coinValue}</span>
-          </span>
-          {history.payouts && history.payouts['player'] !== undefined && (
-            <span className="text-gray-400">
-              {t('history.payout')}: {' '}
-              <span className={history.payouts['player'] >= 0 ? 'text-green-400' : 'text-red-400'}>
-                {history.payouts['player'] >= 0 ? '+' : ''}
-                {history.payouts['player']} {t('common.coins')}
-              </span>
-            </span>
-          )}
-        </div>
-        {history.instantWinSets && history.instantWinSets.length > 0 && (
-          <div className="flex gap-1.5 mt-2 flex-wrap">
-            {history.instantWinSets.map((s, i) => (
-              <Badge key={i} className="bg-yellow-600/50 text-yellow-200 text-xs">
-                {s.name} +{s.points}
-              </Badge>
-            ))}
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full text-left"
+      >
+        <CardHeader className="pb-2 flex flex-row items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-white text-base">
+              {isAI
+                ? t('history.gameVsAi', { count: history.opponentCount })
+                : t('history.gameVsPlayers', { count: history.opponentCount })}
+            </CardTitle>
+            <p className="text-xs text-gray-500 mt-0.5">{date} {time}</p>
           </div>
-        )}
-      </CardContent>
+          <div className="flex items-center gap-3 shrink-0">
+            {myPayout !== undefined && (
+              <span className={`text-sm font-semibold ${myPayout >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {myPayout >= 0 ? '+' : ''}{myPayout} {t('common.coins')}
+              </span>
+            )}
+            <Badge className={isWin ? 'bg-green-600' : 'bg-red-600'}>
+              {isWin ? t('history.won') : t('history.lost')}
+            </Badge>
+            <span className="text-gray-500 text-xs">{open ? '▲' : '▼'}</span>
+          </div>
+        </CardHeader>
+      </button>
+
+      {open && (
+        <CardContent className="pt-0 pb-4">
+          <div className="border-t border-gray-800 pt-3 space-y-1.5">
+            {sortedPlayers.map((p) => {
+              const payout = history.payouts?.[p.id];
+              const isMe = p.id === userId;
+              const isWinner = p.id === history.winnerId;
+              return (
+                <div key={p.id} className="flex items-center justify-between text-sm">
+                  <span className="text-gray-300">
+                    {p.name}
+                    {isMe && <span className="text-gray-500 ml-1">({t('history.you')})</span>}
+                    {isWinner && <span className="text-yellow-500 ml-1">👑</span>}
+                  </span>
+                  <span className={
+                    payout !== undefined
+                      ? payout >= 0 ? 'text-green-400' : 'text-red-400'
+                      : 'text-gray-500'
+                  }>
+                    {payout !== undefined
+                      ? `${payout >= 0 ? '+' : ''}${payout} ${t('common.coins')}`
+                      : '—'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {history.instantWinSets && history.instantWinSets.length > 0 && (
+            <div className="flex gap-1.5 mt-3 flex-wrap">
+              {history.instantWinSets.map((s, i) => (
+                <Badge key={i} className="bg-yellow-600/50 text-yellow-200 text-xs">
+                  {s.name} +{s.points}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      )}
     </Card>
   );
 }
@@ -76,6 +106,10 @@ export default function HistoryPage() {
   const [items, setItems] = useState<GameHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
+  const [tab, setTab] = useState<'ai' | 'online'>('online');
+
+  const isAI = (item: GameHistoryItem) => item.players.some((p) => p.isAI);
+  const filtered = items.filter((item) => tab === 'ai' ? isAI(item) : !isAI(item));
 
   useEffect(() => {
     if (!nickname || !userId) {
@@ -95,24 +129,52 @@ export default function HistoryPage() {
     <div className="min-h-[calc(100vh-3.5rem)] p-6">
       <div className="max-w-3xl mx-auto">
         <h1 className="text-2xl font-bold text-white mb-2">{t('history.title')}</h1>
+
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setTab('ai')}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+              tab === 'ai'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+            }`}
+          >
+            {t('history.tabAi')}
+          </button>
+          <button
+            onClick={() => setTab('online')}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+              tab === 'online'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+            }`}
+          >
+            {t('history.tabOnline')}
+          </button>
+        </div>
+
         <p className="text-gray-400 mb-8">
-          {total > 0 ? t('history.subtitleWithCount', { count: total }) : t('history.subtitle')}
+          {filtered.length > 0 ? t('history.subtitleWithCount', { count: filtered.length }) : t('history.subtitle')}
         </p>
 
         {loading ? (
           <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>
-        ) : items.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <Card className="bg-gray-900 border-gray-800">
             <CardContent className="py-12 text-center">
               <div className="text-4xl mb-4">📋</div>
-              <p className="text-gray-400 text-lg">{t('history.empty')}</p>
-              <p className="text-gray-500 text-sm mt-1">{t('history.emptyHint')}</p>
+              <p className="text-gray-400 text-lg">
+                {tab === 'ai' ? t('history.emptyAi') : t('history.emptyOnline')}
+              </p>
+              <p className="text-gray-500 text-sm mt-1">
+                {tab === 'ai' ? t('history.emptyHintAi') : t('history.emptyHintOnline')}
+              </p>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-3">
-            {items.map((item) => (
-              <GameCard key={item._id} history={item} t={t} />
+            {filtered.map((item) => (
+              <GameCard key={item._id} history={item} userId={userId} t={t} />
             ))}
           </div>
         )}

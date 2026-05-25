@@ -45,6 +45,8 @@ export function RejoinBanner() {
   }
 
   const handleRejoin = () => {
+    if (isReconnecting) return;
+
     const socket = getSocket();
     if (!socket?.connected) {
       toast('Not connected to server');

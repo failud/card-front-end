@@ -77,7 +77,7 @@ interface OnlineGameState {
 
 interface OnlineGameActions {
   // Room actions
-  createRoom: (playerCount: number, coinValue: number) => void;
+  createRoom: (playerCount: number, coinValue: number, isPrivate?: boolean) => void;
   joinRoom: (roomCode: string) => void;
   leaveRoom: () => void;
   startGame: () => void;
@@ -131,10 +131,10 @@ const initialState: OnlineGameState = {
 const onlineGameStore = create<OnlineGameStore>((set, get) => ({
   ...initialState,
 
-  createRoom: (playerCount: number, coinValue: number) => {
+  createRoom: (playerCount: number, coinValue: number, isPrivate = false) => {
     const socket = getSocket();
     if (!socket) return;
-    socket.emit('create_room', { playerCount, coinValue }, (res: { ok?: boolean; error?: string; roomCode?: string }) => {
+    socket.emit('create_room', { playerCount, coinValue, isPrivate }, (res: { ok?: boolean; error?: string; roomCode?: string }) => {
       if (res.error) { set({ error: res.error }); return; }
       const { nickname, userId } = useAuthStore.getState();
       const rc = res.roomCode || '';
@@ -186,7 +186,17 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
     if (!socket || !socket.connected) return;
 
     set({ isReconnecting: true });
+
+    const timeoutId = setTimeout(() => {
+      const state = get();
+      if (state.isReconnecting) {
+        clearReconnectData();
+        set({ isReconnecting: false, error: 'Reconnection timed out' });
+      }
+    }, 5000);
+
     socket.emit('join_room', { roomCode: data.roomCode }, (res: { ok?: boolean; error?: string }) => {
+      clearTimeout(timeoutId);
       if (res.error) {
         clearReconnectData();
         set({ isReconnecting: false, error: res.error });
@@ -268,22 +278,24 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
 
     socket.on('room_state', (data: { room: { code: string; hostId: string; config: { playerCount: number; coinValue: number }; players: RoomPlayer[]; phase: string } }) => {
       const { room } = data;
+      const myId = useAuthStore.getState().userId;
       set({
         roomCode: room.code,
         playerCount: room.config.playerCount,
         players: room.players,
         coinValue: room.config.coinValue,
         phase: room.phase as OnlinePhase,
+        isHost: room.hostId === myId,
         error: null,
       });
     });
 
-    socket.on('game_started', (data: { opponents: RoomOpponent[]; centralCard: Card; coinValue: number; playerOrder: string[] }) => {
-      set({
+    socket.on('game_started', (data: { opponents: RoomOpponent[]; centralCard: Card; coinValue: number; playerOrder: string[]; isReconnect?: boolean }) => {
+      set((s) => ({
         opponents: data.opponents,
         centralCard: data.centralCard,
         coinValue: data.coinValue,
-        phase: 'ready-check',
+        phase: data.isReconnect ? (s.phase === 'idle' ? 'ready-check' : s.phase) : 'ready-check',
         // Clear previous game state
         currentPlay: null,
         currentPlayerId: null,
@@ -297,7 +309,7 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
         winDetail: null,
         readyPlayers: [],
         error: null,
-      });
+      }));
     });
 
     socket.on('hand_dealt', (data: { cards: Card[] }) => {

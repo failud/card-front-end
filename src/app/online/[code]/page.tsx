@@ -95,7 +95,7 @@ function OpponentCard({
   return (
     <div
       className={cn(
-        "flex flex-col items-center gap-1 bg-gray-900/70 border rounded-xl p-1.5 sm:p-3 min-w-0 sm:min-w-[120px] transition-colors",
+        "flex flex-col items-center gap-1 bg-gray-900/70 border rounded-xl p-1.5 sm:p-3 min-w-0 sm:min-w-30 transition-colors",
         isActive
           ? "border-yellow-500/50 bg-yellow-500/5"
           : "border-gray-700/50",
@@ -104,7 +104,7 @@ function OpponentCard({
       <FannedCardBacks count={handSize} />
       <p
         className={cn(
-          "text-[10px] sm:text-xs font-medium text-center truncate max-w-[72px] sm:max-w-[100px] text-white",
+          "text-[10px] sm:text-xs font-medium text-center truncate max-w-18 sm:max-w-25 text-white",
           isActive && "text-yellow-400",
         )}
       >
@@ -198,7 +198,7 @@ export default function OnlineGamePage({
   }, []);
 
   // Warn before leaving while in a game
-  useBeforeUnload(phase === "playing" || phase === "ready-check", roomCode);
+  useBeforeUnload(phase === "playing" || phase === "ready-check");
 
   const isMyTurn = currentPlayerId !== null && currentPlayerId === userId;
 
@@ -220,31 +220,32 @@ export default function OnlineGamePage({
 
     listenToEvents(token);
 
-    if (!roomCode) {
-      const doRejoin = () => {
-        const socket = getSocket();
-        if (!socket?.connected) return;
-        socket.emit(
-          "join_room",
-          { roomCode: code },
-          (res: { ok?: boolean; error?: string }) => {
-            if (res.error) {
-              router.push("/online");
-            }
-          },
-        );
-      };
-
+    const doRejoin = () => {
       const socket = getSocket();
-      if (socket?.connected) {
-        doRejoin();
-      } else {
-        socket?.on("connect", doRejoin);
-        return () => {
-          socket?.off("connect", doRejoin);
-        };
-      }
+      if (!socket?.connected) return;
+      socket.emit(
+        "join_room",
+        { roomCode: roomCode || code },
+        (res: { ok?: boolean; error?: string }) => {
+          if (res.error) {
+            router.push("/online");
+          }
+        },
+      );
+    };
+
+    const socket = getSocket();
+    if (socket?.connected && !roomCode) {
+      // Fresh load — no roomCode in store, join using URL param
+      doRejoin();
     }
+
+    // Always listen for reconnect events to re-establish room membership
+    // after a network drop (socket.io reconnects but backend needs the new socket ID)
+    socket?.on("connect", doRejoin);
+    return () => {
+      socket?.off("connect", doRejoin);
+    };
   }, [nickname, token, router, listenToEvents, roomCode, code]);
 
   // Show error as toast

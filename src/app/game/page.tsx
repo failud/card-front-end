@@ -108,7 +108,7 @@ function OpponentCard({
       <p
         className={cn(
           "font-medium text-center truncate",
-          isMobile ? "text-[10px] max-w-[72px]" : "text-xs max-w-25",
+          isMobile ? "text-[10px] max-w-18" : "text-xs max-w-25",
           player.isOut ? "text-green-500" : "text-white",
           isActive && "text-yellow-400",
         )}

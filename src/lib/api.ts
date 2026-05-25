@@ -115,3 +115,21 @@ export function saveGame(data: SaveGamePayload): Promise<{ id: string }> {
     body: JSON.stringify(data),
   });
 }
+
+// ── Rooms ──
+
+export interface PublicRoom {
+  code: string;
+  hostId: string;
+  config: { playerCount: number; coinValue: number };
+  players: { id: string; name: string; connected: boolean }[];
+  phase: string;
+}
+
+export interface RoomsResponse {
+  rooms: PublicRoom[];
+}
+
+export function fetchRooms(): Promise<RoomsResponse> {
+  return apiFetch<RoomsResponse>('/rooms');
+}

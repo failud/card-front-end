@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useOnlineGameStore } from '@/stores/online-game-store';
 import { getSocket } from '@/lib/socket';
 import { useBeforeUnload } from '@/hooks/use-before-unload';
+import { fetchRooms, type PublicRoom } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +15,11 @@ import { COIN_LEVELS } from '@/lib/constants';
 import { useTranslations } from '@/lib/i18n';
 
 const COIN_LEVEL_KEYS = ['casual', 'low', 'medium', 'standard', 'high', 'veryHigh', 'premium'] as const;
+
+const COIN_VALUE_TO_KEY: Record<number, string> = {};
+COIN_LEVELS.forEach((level, i) => {
+  COIN_VALUE_TO_KEY[level.value] = COIN_LEVEL_KEYS[i];
+});
 
 export default function OnlinePage() {
   const router = useRouter();
@@ -28,7 +34,31 @@ export default function OnlinePage() {
   const [joinCode, setJoinCode] = useState('');
   const [localPlayerCount, setLocalPlayerCount] = useState(3);
   const [coinLevel, setCoinLevel] = useState(0);
+  const [isPrivate, setIsPrivate] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [publicRooms, setPublicRooms] = useState<PublicRoom[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(false);
+
+  const loadRooms = useCallback(async () => {
+    setRoomsLoading(true);
+    try {
+      const data = await fetchRooms();
+      setPublicRooms(data.rooms);
+    } catch {
+      // Silent fail - room list is non-critical
+    } finally {
+      setRoomsLoading(false);
+    }
+  }, []);
+
+  // Fetch public rooms on mount and when not in a room
+  useEffect(() => {
+    if (!mounted) return;
+    if (phase === 'lobby' && roomCode) return; // Don't show rooms while in a room
+    loadRooms();
+    const interval = setInterval(loadRooms, 10000); // Poll every 10s
+    return () => clearInterval(interval);
+  }, [mounted, phase, roomCode, loadRooms]);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -39,16 +69,33 @@ export default function OnlinePage() {
     if (!nickname) { router.push('/'); return; }
     listenToEvents(token);
 
-    // Try to reconnect to a previous room after connecting
-    const socket = getSocket();
-    if (socket?.connected) {
-      reconnectToRoom();
-    } else {
-      const onConnect = () => { reconnectToRoom(); };
-      socket?.on('connect', onConnect);
-      return () => { socket?.off('connect', onConnect); };
+    // Try to reconnect to a previous room on initial mount
+    if (!roomCode) {
+      const socket = getSocket();
+      if (socket?.connected) {
+        reconnectToRoom();
+      }
     }
-  }, [nickname, token, router, listenToEvents]);
+
+    // Always listen for socket reconnect to re-establish room membership
+    const onConnect = () => {
+      if (roomCode) {
+        // Already in a room — re-join to update socket ID on backend
+        const socket = getSocket();
+        if (socket?.connected) {
+          socket.emit('join_room', { roomCode },
+            (res: { ok?: boolean; error?: string }) => {
+              if (res.error) setError(res.error);
+            });
+        }
+      } else {
+        reconnectToRoom();
+      }
+    };
+    const socket = getSocket();
+    socket?.on('connect', onConnect);
+    return () => { socket?.off('connect', onConnect); };
+  }, [nickname, token, router, listenToEvents, roomCode]);
 
   // Navigate to game when it starts
   useEffect(() => {
@@ -58,7 +105,7 @@ export default function OnlinePage() {
   }, [phase, roomCode, router]);
 
   const handleCreateRoom = () => {
-    createRoom(localPlayerCount, COIN_LEVELS[coinLevel].value);
+    createRoom(localPlayerCount, COIN_LEVELS[coinLevel].value, isPrivate);
   };
 
   const handleJoinRoom = () => {
@@ -79,10 +126,10 @@ export default function OnlinePage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg sm:text-xl font-bold text-white">
-            Room: <span className="text-red-400">{roomCode}</span>
+            {t('online.roomTitle', { code: roomCode })}
           </h2>
           <p className="text-gray-400 text-sm">
-            {players.length} / {storePlayerCount} players
+            {t('online.playersCount', { current: players.length, total: storePlayerCount })}
           </p>
         </div>
         <div className="flex gap-2">
@@ -106,146 +153,252 @@ export default function OnlinePage() {
       </div>
 
       <div className="max-h-[35vh] sm:max-h-[45vh] overflow-y-auto space-y-2 -mx-1 px-1">
-        <p className="text-sm text-gray-500 uppercase sticky top-0 bg-gray-950 pb-1">Players</p>
+        <p className="text-sm text-gray-500 uppercase sticky top-0 bg-gray-950 pb-1">{t('online.playersSection')}</p>
         {players.map((p, i) => (
           <div key={p.id} className="flex items-center gap-2 sm:gap-3 py-2 px-3 rounded bg-gray-800/50">
             <span className="text-gray-400 text-sm w-5 sm:w-6">{i + 1}.</span>
             <span className="text-white text-sm sm:text-base flex-1 truncate">{p.name}</span>
             {p.id === players[0]?.id && (
-              <Badge className="bg-yellow-600/50 text-yellow-200 text-xs shrink-0">Host</Badge>
+              <Badge className="bg-yellow-600/50 text-yellow-200 text-xs shrink-0">{t('online.host')}</Badge>
             )}
             {!p.connected && (
-              <Badge className="bg-red-600/50 text-red-200 text-xs shrink-0">Disconnected</Badge>
+              <Badge className="bg-red-600/50 text-red-200 text-xs shrink-0">{t('online.disconnected')}</Badge>
             )}
           </div>
         ))}
         {Array.from({ length: Math.max(0, storePlayerCount - players.length) }).map((_, i) => (
           <div key={`waiting-${i}`} className="flex items-center gap-2 sm:gap-3 py-2 px-3 rounded bg-gray-800/20 border border-dashed border-gray-700">
             <span className="text-gray-600 text-sm w-5 sm:w-6">{players.length + i + 1}.</span>
-            <span className="text-gray-600 text-sm">Waiting for player...</span>
+            <span className="text-gray-600 text-sm">{t('online.waitingForPlayer')}</span>
           </div>
         ))}
       </div>
 
       <p className="text-gray-500 text-xs sm:text-sm text-center">
-        Share this code:{' '}
+        {t('online.shareCode')}{' '}
         <span className="text-white font-bold tracking-widest text-base sm:text-lg">{roomCode}</span>
       </p>
     </div>
   );
 
   const renderForms = () => (
-    <div className="grid gap-4 sm:grid-cols-2 max-w-xl mx-auto">
-      {/* Create Room */}
-      <Card className="bg-gray-900 border-gray-800">
-        <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="text-white text-base sm:text-lg">Create Room</CardTitle>
-          <CardDescription className="text-gray-400 text-xs sm:text-sm">
-            Create a new game room and share the code
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 px-4 pb-4 sm:px-6 sm:pb-6">
-          {showCreate ? (
-            <>
-              <div>
-                <label className="text-sm text-gray-300 block mb-2">
-                  Players: {localPlayerCount}
-                </label>
+    <div className="space-y-6 max-w-xl mx-auto">
+      <div className="grid gap-4 sm:grid-cols-2">
+        {/* Create Room */}
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-white text-base sm:text-lg">{t('online.createRoom')}</CardTitle>
+            <CardDescription className="text-gray-400 text-xs sm:text-sm">
+              {t('online.createRoomDesc')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 px-4 pb-4 sm:px-6 sm:pb-6">
+            {showCreate ? (
+              <>
+                <div>
+                  <label className="text-sm text-gray-300 block mb-2">
+                    {t('online.playersLabel', { count: localPlayerCount })}
+                  </label>
+                  <div className="flex gap-2">
+                    {[3, 4, 5].map((n) => (
+                      <Button
+                        key={n}
+                        variant={localPlayerCount === n ? 'default' : 'outline'}
+                        className={localPlayerCount === n
+                          ? 'bg-red-600 hover:bg-red-700 h-9 sm:h-10 flex-1'
+                          : 'border-gray-700 text-gray-300 hover:bg-gray-800 h-9 sm:h-10 flex-1'}
+                        onClick={() => setLocalPlayerCount(n)}
+                      >
+                        {n}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm text-gray-300 block mb-2">{t('online.betLevel')}</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    {COIN_LEVELS.map((level, i) => (
+                      <Button
+                        key={i}
+                        variant={coinLevel === i ? 'default' : 'outline'}
+                        size="sm"
+                        className={coinLevel === i
+                          ? 'bg-red-600 hover:bg-red-700 text-xs h-auto py-1.5'
+                          : 'border-gray-700 text-gray-300 hover:bg-gray-800 text-xs h-auto py-1.5'}
+                        onClick={() => setCoinLevel(i)}
+                      >
+                        <span className="flex flex-col items-center gap-0.5">
+                          <span>{t(`coinLevels.${COIN_LEVEL_KEYS[i]}`)}</span>
+                          <span className={coinLevel === i ? 'text-red-200' : 'text-gray-500'}>
+                            {t('online.coinMultiplier', { value: level.value })}
+                          </span>
+                        </span>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm text-gray-300 block mb-2">{t('online.roomVisibility')}</label>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={isPrivate ? 'outline' : 'default'}
+                      className={
+                        isPrivate
+                          ? 'border-gray-700 text-gray-300 hover:bg-gray-800 h-9 flex-1'
+                          : 'bg-green-600 hover:bg-green-700 h-9 flex-1'
+                      }
+                      onClick={() => setIsPrivate(false)}
+                    >
+                      {t('online.public')}
+                    </Button>
+                    <Button
+                      variant={isPrivate ? 'default' : 'outline'}
+                      className={
+                        isPrivate
+                          ? 'bg-yellow-600 hover:bg-yellow-700 h-9 flex-1'
+                          : 'border-gray-700 text-gray-300 hover:bg-gray-800 h-9 flex-1'
+                      }
+                      onClick={() => setIsPrivate(true)}
+                    >
+                      {t('online.private')}
+                    </Button>
+                  </div>
+                </div>
                 <div className="flex gap-2">
-                  {[3, 4, 5].map((n) => (
-                    <Button
-                      key={n}
-                      variant={localPlayerCount === n ? 'default' : 'outline'}
-                      className={localPlayerCount === n
-                        ? 'bg-red-600 hover:bg-red-700 h-9 sm:h-10 flex-1'
-                        : 'border-gray-700 text-gray-300 hover:bg-gray-800 h-9 sm:h-10 flex-1'}
-                      onClick={() => setLocalPlayerCount(n)}
-                    >
-                      {n}
-                    </Button>
-                  ))}
+                  <Button
+                    variant="outline"
+                    className="flex-1 border-gray-700 text-gray-300 hover:bg-gray-800 h-9 sm:h-10"
+                    onClick={() => setShowCreate(false)}
+                  >
+                    {t('common.cancel')}
+                  </Button>
+                  <Button
+                    className="flex-1 bg-red-600 hover:bg-red-700 h-9 sm:h-10"
+                    onClick={handleCreateRoom}
+                  >
+                    {t('online.create')}
+                  </Button>
                 </div>
-              </div>
-              <div>
-                <label className="text-sm text-gray-300 block mb-2">Bet Level</label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                  {COIN_LEVELS.map((level, i) => (
-                    <Button
-                      key={i}
-                      variant={coinLevel === i ? 'default' : 'outline'}
-                      size="sm"
-                      className={coinLevel === i
-                        ? 'bg-red-600 hover:bg-red-700 text-xs h-9 sm:h-8'
-                        : 'border-gray-700 text-gray-300 hover:bg-gray-800 text-xs h-9 sm:h-8'}
-                      onClick={() => setCoinLevel(i)}
-                    >
-                      {t(`coinLevels.${COIN_LEVEL_KEYS[i]}`)}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1 border-gray-700 text-gray-300 hover:bg-gray-800 h-9 sm:h-10"
-                  onClick={() => setShowCreate(false)}
-                >
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  className="flex-1 bg-red-600 hover:bg-red-700 h-9 sm:h-10"
-                  onClick={handleCreateRoom}
-                >
-                  Create
-                </Button>
-              </div>
-            </>
-          ) : (
-            <Button className="w-full bg-red-600 hover:bg-red-700 h-10 sm:h-11" onClick={() => setShowCreate(true)}>
-              Create New Room
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+              </>
+            ) : (
+              <Button className="w-full bg-red-600 hover:bg-red-700 h-10 sm:h-11" onClick={() => setShowCreate(true)}>
+                {t('online.createNewRoom')}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Join Room */}
-      <Card className="bg-gray-900 border-gray-800">
-        <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="text-white text-base sm:text-lg">Join Room</CardTitle>
-          <CardDescription className="text-gray-400 text-xs sm:text-sm">
-            Enter a room code to join an existing game
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 px-4 pb-4 sm:px-6 sm:pb-6">
-          <Input
-            placeholder="Enter room code (e.g. ABC123)"
-            value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-            maxLength={6}
-            className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 h-11 text-center tracking-widest text-base sm:text-lg"
-          />
+        {/* Join Room */}
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-white text-base sm:text-lg">{t('online.joinRoom')}</CardTitle>
+            <CardDescription className="text-gray-400 text-xs sm:text-sm">
+              {t('online.joinRoomDesc')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 px-4 pb-4 sm:px-6 sm:pb-6">
+            <Input
+              placeholder={t('online.joinRoomPlaceholder')}
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              maxLength={6}
+              className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 h-11 text-center tracking-widest text-base sm:text-lg"
+            />
+            <Button
+              className="w-full bg-red-600 hover:bg-red-700 h-10 sm:h-11"
+              disabled={joinCode.trim().length < 4}
+              onClick={handleJoinRoom}
+            >
+              {t('online.joinRoom')}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Public Room List */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm text-gray-400 uppercase tracking-wider">
+            {t('online.availableRooms')}
+          </h3>
           <Button
-            className="w-full bg-red-600 hover:bg-red-700 h-10 sm:h-11"
-            disabled={joinCode.trim().length < 4}
-            onClick={handleJoinRoom}
+            variant="outline"
+            size="sm"
+            className="border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800 h-7 text-xs"
+            onClick={loadRooms}
+            disabled={roomsLoading}
           >
-            Join Room
+            {t('online.refreshRooms')}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+        {roomsLoading && publicRooms.length === 0 ? (
+          <div className="text-center py-4 text-gray-500 text-sm">{t('common.loading')}</div>
+        ) : publicRooms.length === 0 ? (
+          <div className="text-center py-4 text-gray-500 text-sm bg-gray-900/50 rounded-lg border border-dashed border-gray-800">
+            {t('online.noRooms')}
+          </div>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {publicRooms.map((room) => {
+              const host = room.players.find((p) => p.id === room.hostId);
+              const coinKey = COIN_VALUE_TO_KEY[room.config.coinValue];
+              return (
+                <div
+                  key={room.code}
+                  className="flex items-center justify-between bg-gray-900/70 border border-gray-800 rounded-lg px-4 py-3 hover:border-red-500/30 transition-colors"
+                >
+                  <div className="min-w-0 flex-1 mr-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-bold tracking-wider text-sm">
+                        {room.code}
+                      </span>
+                      {coinKey && (
+                        <span className="text-[10px] text-yellow-400 bg-yellow-400/10 px-1.5 py-0.5 rounded">
+                          {t(`coinLevels.${coinKey}`)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-gray-500 text-xs mt-0.5">
+                      {t('online.playersInRoom', {
+                        current: room.players.length,
+                        max: room.config.playerCount,
+                      })}
+                    </p>
+                    {host && (
+                      <p className="text-gray-600 text-[10px] truncate">
+                        {t('online.hostLabel', { name: host.name })}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    className="bg-red-600 hover:bg-red-700 h-8 text-xs shrink-0"
+                    onClick={() => {
+                      setJoinCode(room.code);
+                      joinRoom(room.code);
+                    }}
+                  >
+                    {t('online.joinButton')}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] p-4 sm:p-6">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-xl sm:text-2xl font-bold text-white mb-1 sm:mb-2">Online Multiplayer</h1>
-        <p className="text-sm text-gray-400 mb-6 sm:mb-8">Play Koi with real players in real-time</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-white mb-1 sm:mb-2">{t('online.title')}</h1>
+        <p className="text-sm text-gray-400 mb-6 sm:mb-8">{t('online.subtitle')}</p>
 
         {error && (
           <div className="mb-4 p-3 rounded bg-red-600/20 border border-red-600/30 text-red-300 text-sm">
             {error}
-            <button className="ml-2 underline" onClick={() => setError(null)}>Dismiss</button>
+            <button className="ml-2 underline" onClick={() => setError(null)}>{t('online.dismiss')}</button>
           </div>
         )}
 
