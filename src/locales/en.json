@@ -75,7 +75,11 @@
     "joinButton": "Join",
     "refreshRooms": "Refresh",
     "reconnectTimedOut": "Reconnection timed out. The room may have expired.",
-    "roomExpired": "Room has expired due to inactivity."
+    "roomExpired": "Room has expired due to inactivity.",
+    "backToLobby": "Back to Lobby",
+    "ready": "Ready",
+    "notReady": "Not Ready",
+    "readyButton": "Ready"
   },
   "profile": {
     "title": "Profile",

@@ -109,7 +109,7 @@ interface GameState {
   coinValue: number;
   winDetail: WinDetail | null;
 
-  initGame: (playerName: string, opponentCount: number, coinValue: number) => void;
+  initGame: (playerName: string, opponentCount: number, coinValue: number, previousWinnerId?: string) => void;
   playCards: (cards: Card[]) => string | void;
   pass: () => string | void;
   declareInstantWin: () => void;
@@ -141,7 +141,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
   coinValue: 1,
   winDetail: null,
 
-  initGame: (playerName: string, opponentCount: number, coinValue: number) => {
+  initGame: (playerName: string, opponentCount: number, coinValue: number, previousWinnerId?: string) => {
     const deck = shuffle(createDeck());
     const totalPlayers = opponentCount + 1;
     const { hands, remaining, centralCard } = deal(deck, totalPlayers);
@@ -203,12 +203,16 @@ export const useGameStore = create<GameState>()((set, get) => ({
 
     const humanInstantWins = checkInstantWin(players[0].hand, centralCard);
 
+    const startIndex = previousWinnerId
+      ? players.findIndex((p) => p.id === previousWinnerId)
+      : -1;
+
     set({
       phase: 'ready-check',
       players,
       centralCard,
       deck: remaining,
-      currentPlayerIndex: 0,
+      currentPlayerIndex: startIndex >= 0 ? startIndex : 0,
       roundHistory: [],
       leadingSuit: null,
       currentPlay: null,

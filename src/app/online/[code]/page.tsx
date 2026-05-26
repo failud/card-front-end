@@ -121,8 +121,8 @@ function OpponentCard({
         {handSize} {t("common.cards")}
       </span>
       <PlayedCards
-        records={compact ? history.slice(-1) : history}
-        fanned={!compact}
+        records={history.slice(-1)}
+        fanned={false}
       />
     </div>
   );
@@ -189,6 +189,7 @@ export default function OnlineGamePage({
   const [draggedCard, setDraggedCard] = useState<CardType | null>(null);
   const [mounted, setMounted] = useState(false);
   const handRef = useRef<PlayerHandHandle>(null);
+  const autoPassedRef = useRef(false);
   const isMobile = useViewportStore((s) => s.isMobile);
   const isLandscape = useViewportStore((s) => s.isLandscape);
   const compact = isMobile && isLandscape;
@@ -204,12 +205,6 @@ export default function OnlineGamePage({
 
   // Filter opponents (exclude self)
   const otherOpponents = opponents.filter((o) => o.id !== userId);
-  const gridCols =
-    otherOpponents.length <= 2
-      ? "grid-cols-2"
-      : otherOpponents.length === 3
-        ? "grid-cols-2 sm:grid-cols-3"
-        : "grid-cols-2 sm:grid-cols-3";
 
   // Setup socket listeners and reconnect to room
   useEffect(() => {
@@ -255,6 +250,19 @@ export default function OnlineGamePage({
     }
   }, [error, toast]);
 
+  // Auto-pass when timer expires (never auto-play cards)
+  useEffect(() => {
+    if (phase === "playing" && isMyTurn && timer <= 0 && !autoPassedRef.current) {
+      autoPassedRef.current = true;
+      storePass();
+    }
+  }, [timer, phase, isMyTurn, storePass]);
+
+  // Reset auto-pass guard when my turn changes
+  useEffect(() => {
+    autoPassedRef.current = false;
+  }, [currentPlayerId]);
+
   const handlePlay = useCallback(
     (cards: CardType[]) => {
       storePlayCards(cards.map((c) => c.id));
@@ -265,25 +273,6 @@ export default function OnlineGamePage({
   const handlePass = useCallback(() => {
     storePass();
   }, [storePass]);
-
-  // Auto-pass when timer expires
-  const autoPassedRef = useRef(false);
-  useEffect(() => {
-    if (isMyTurn && phase === "playing" && timer <= 0) {
-      if (!autoPassedRef.current) {
-        autoPassedRef.current = true;
-        storePass();
-      }
-    }
-    // Reset when turn changes or timer resets
-    if (timer > 0) {
-      autoPassedRef.current = false;
-    }
-  }, [timer, isMyTurn, phase, storePass]);
-  // Reset on new turn
-  useEffect(() => {
-    autoPassedRef.current = false;
-  }, [currentPlayerId]);
 
   const handleInstantWin = () => {
     declareInstantWin();
@@ -338,26 +327,30 @@ export default function OnlineGamePage({
         <div className="flex-1 relative mx-1 sm:mx-2 mt-1 sm:mt-2 mb-0">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(34,197,94,0.15),transparent_70%)] pointer-events-none" />
 
-          {/* ── Opponents grid at top ── */}
+          {/* ── Opponents at top, pinned to edges ── */}
           <div
-            className={`absolute top-0 left-0 right-0 z-20 grid ${gridCols} ${compact ? "gap-1 p-1" : "gap-2 sm:gap-3 p-2 sm:p-4"} justify-items-center`}
+            className={`absolute top-0 gap-2 z-20 grid grid-cols-2 left-0 right-0 ${compact ? "px-0.5 py-0.5" : isMobile ? "px-2 py-1" : "p-2 sm:p-4"}`}
           >
-            {otherOpponents.map((opp) => {
+            {otherOpponents.map((opp, i) => {
               const isActive =
                 currentPlayerId === opp.id && phase === "playing";
               const playerHistory = gameHistory.filter(
                 (r) => r.playerId === opp.id,
               );
               return (
-                <OpponentCard
+                <div
                   key={opp.id}
-                  name={opp.name}
-                  handSize={opp.handSize}
-                  isActive={isActive}
-                  history={playerHistory}
-                  t={t}
-                  isMobile={isMobile}
-                />
+                  className={i % 2 === 0 ? "justify-self-start" : "justify-self-end"}
+                >
+                  <OpponentCard
+                    name={opp.name}
+                    handSize={opp.handSize}
+                    isActive={isActive}
+                    history={playerHistory}
+                    t={t}
+                    isMobile={isMobile}
+                  />
+                </div>
               );
             })}
           </div>
@@ -400,7 +393,7 @@ export default function OnlineGamePage({
 
               {currentPlay && currentPlay.type !== "pass" ? (
                 <div className="flex flex-col items-center gap-1">
-                  <span className="text-[10px] text-green-300/80 bg-black/40 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] text-green-300/80 bg-black/40 px-1 py-0.5 rounded-full">
                     {currentPlay.playerId === userId
                       ? t("common.you")
                       : currentPlayerName || currentPlay.playerId}
@@ -527,7 +520,7 @@ export default function OnlineGamePage({
 
         {/* ======== BOTTOM: Hand + Controls ======== */}
         <div
-          className={`bg-black/50 backdrop-blur border-t border-green-900/50 ${compact ? "p-1" : "p-2 sm:p-3"}`}
+          className={`bg-black/50 backdrop-blur border-t border-green-900/50 ${compact ? "p-1" : "p-2 sm:p-1"}`}
         >
           {(phase === "playing" || phase === "ready-check") && (
             <PlayerHand
@@ -786,13 +779,10 @@ export default function OnlineGamePage({
                   {t("game.exitGame")}
                 </Button>
                 <Button
-                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50"
-                  disabled={readyPlayers.includes(userId)}
-                  onClick={playerReady}
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  onClick={() => router.push("/online")}
                 >
-                  {readyPlayers.includes(userId)
-                    ? t("game.waitingReady")
-                    : t("game.readyButton")}
+                  {t("online.backToLobby")}
                 </Button>
               </div>
             </div>

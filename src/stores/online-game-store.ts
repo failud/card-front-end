@@ -73,6 +73,7 @@ interface OnlineGameState {
   coinValue: number;
   error: string | null;
   isReconnecting: boolean;
+  arrangeMode: ArrangeMode | null;
 }
 
 interface OnlineGameActions {
@@ -126,6 +127,7 @@ const initialState: OnlineGameState = {
   coinValue: 1,
   error: null,
   isReconnecting: false,
+  arrangeMode: null,
 };
 
 const onlineGameStore = create<OnlineGameStore>((set, get) => ({
@@ -253,7 +255,7 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
 
   arrangeHand: (mode: ArrangeMode) => {
     const { hand } = get();
-    set({ hand: sortHand(hand, mode) });
+    set({ hand: sortHand(hand, mode), arrangeMode: mode });
   },
 
   listenToEvents: (token: string) => {
@@ -276,7 +278,7 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
     socket.off('error');
     socket.off('disconnect');
 
-    socket.on('room_state', (data: { room: { code: string; hostId: string; config: { playerCount: number; coinValue: number }; players: RoomPlayer[]; phase: string } }) => {
+    socket.on('room_state', (data: { room: { code: string; hostId: string; config: { playerCount: number; coinValue: number }; players: RoomPlayer[]; phase: string; readyPlayers: string[] } }) => {
       const { room } = data;
       const myId = useAuthStore.getState().userId;
       set({
@@ -286,6 +288,7 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
         coinValue: room.config.coinValue,
         phase: room.phase as OnlinePhase,
         isHost: room.hostId === myId,
+        readyPlayers: room.readyPlayers,
         error: null,
       });
     });
@@ -313,11 +316,13 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
     });
 
     socket.on('hand_dealt', (data: { cards: Card[] }) => {
-      set({ hand: data.cards });
+      const mode = get().arrangeMode;
+      set({ hand: mode ? sortHand(data.cards, mode) : data.cards });
     });
 
     socket.on('hand_update', (data: { cards: Card[] }) => {
-      set({ hand: data.cards });
+      const mode = get().arrangeMode;
+      set({ hand: mode ? sortHand(data.cards, mode) : data.cards });
     });
 
     socket.on('instant_win_check', (data: { results: InstantWinResult[] }) => {

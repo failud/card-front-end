@@ -23,12 +23,17 @@ COIN_LEVELS.forEach((level, i) => {
 
 export default function OnlinePage() {
   const router = useRouter();
-  const { nickname, token } = useAuthStore();
+  const { nickname, token, userId } = useAuthStore();
   const { t } = useTranslations();
   const {
     phase, roomCode, isHost, playerCount: storePlayerCount, players, error, isReconnecting,
     createRoom, joinRoom, leaveRoom, startGame, listenToEvents, setError, reconnectToRoom,
+    readyPlayers, playerReady,
   } = useOnlineGameStore();
+
+  const nonHostPlayers = players.filter((p) => p.id !== players[0]?.id && p.connected);
+  const allNonHostReady = nonHostPlayers.length === 0 || nonHostPlayers.every((p) => readyPlayers.includes(p.id));
+  const toggleReady = () => playerReady();
 
   const [showCreate, setShowCreate] = useState(false);
   const [joinCode, setJoinCode] = useState('');
@@ -143,7 +148,7 @@ export default function OnlinePage() {
           {isHost && (
             <Button
               className="bg-red-600 hover:bg-red-700 text-sm h-9 sm:h-10"
-              disabled={players.length < 3}
+              disabled={players.length < 3 || !allNonHostReady}
               onClick={startGame}
             >
               {t('modes.startButton')}
@@ -152,22 +157,30 @@ export default function OnlinePage() {
         </div>
       </div>
 
-      <div className="max-h-[35vh] sm:max-h-[45vh] overflow-y-auto space-y-2 -mx-1 px-1">
-        <p className="text-sm text-gray-500 uppercase sticky top-0 bg-gray-950 pb-1">{t('online.playersSection')}</p>
-        {players.map((p, i) => (
-          <div key={p.id} className="flex items-center gap-2 sm:gap-3 py-2 px-3 rounded bg-gray-800/50">
-            <span className="text-gray-400 text-sm w-5 sm:w-6">{i + 1}.</span>
-            <span className="text-white text-sm sm:text-base flex-1 truncate">{p.name}</span>
-            {p.id === players[0]?.id && (
-              <Badge className="bg-yellow-600/50 text-yellow-200 text-xs shrink-0">{t('online.host')}</Badge>
-            )}
-            {!p.connected && (
-              <Badge className="bg-red-600/50 text-red-200 text-xs shrink-0">{t('online.disconnected')}</Badge>
-            )}
-          </div>
-        ))}
+      <div className="max-h-[35vh] sm:max-h-[45vh] overflow-y-auto space-y-2 mx-0 sm:-mx-10 overflow-x-hidden">
+        <p className="text-sm text-gray-500 uppercase sticky top-0 bg-gray-950 pb-1 px-10">{t('online.playersSection')}</p>
+        {players.map((p, i) => {
+          const isReady = readyPlayers.includes(p.id);
+          return (
+            <div key={p.id} className="flex items-center gap-2 sm:gap-3 py-2 px-3 rounded bg-gray-800/50">
+              <span className="text-gray-400 text-sm w-5 sm:w-6">{i + 1}.</span>
+              <span className="text-white text-sm sm:text-base flex-1 truncate">{p.name}</span>
+              {p.id === players[0]?.id && (
+                <Badge className="bg-yellow-600/50 text-yellow-200 text-xs shrink-0">{t('online.host')}</Badge>
+              )}
+              {!p.connected && (
+                <Badge className="bg-red-600/50 text-red-200 text-xs shrink-0">{t('online.disconnected')}</Badge>
+              )}
+              {p.connected && p.id !== userId && readyPlayers.length > 0 && (
+                <Badge className={isReady ? 'bg-green-600/50 text-green-200 text-xs shrink-0' : 'bg-gray-600/50 text-gray-400 text-xs shrink-0'}>
+                  {isReady ? t('online.ready') : t('online.notReady')}
+                </Badge>
+              )}
+            </div>
+          );
+        })}
         {Array.from({ length: Math.max(0, storePlayerCount - players.length) }).map((_, i) => (
-          <div key={`waiting-${i}`} className="flex items-center gap-2 sm:gap-3 py-2 px-3 rounded bg-gray-800/20 border border-dashed border-gray-700">
+          <div key={`waiting-${i}`} className="flex items-center gap-2 sm:gap-3 py-2 px-5 rounded bg-gray-800/20 border border-dashed border-gray-700">
             <span className="text-gray-600 text-sm w-5 sm:w-6">{players.length + i + 1}.</span>
             <span className="text-gray-600 text-sm">{t('online.waitingForPlayer')}</span>
           </div>
@@ -404,7 +417,7 @@ export default function OnlinePage() {
 
         {!mounted || isReconnecting ? (
           <div className="text-center py-12 text-gray-500">{t('common.loading')}</div>
-        ) : phase === 'lobby' && roomCode ? (
+        ) : (phase === 'lobby' || phase === 'game-over') && roomCode ? (
           renderLobby()
         ) : phase === 'ready-check' || phase === 'playing' ? (
           <div className="text-center py-12">
@@ -413,6 +426,22 @@ export default function OnlinePage() {
           </div>
         ) : (
           renderForms()
+        )}
+
+        {/* Ready button at bottom right for non-host players */}
+        {(phase === 'lobby' || phase === 'game-over') && roomCode &&
+         userId !== players[0]?.id && (
+          <div className="fixed bottom-6 right-6 z-50">
+            <Button
+              size="lg"
+              className={readyPlayers.includes(userId)
+                ? 'bg-green-600 hover:bg-green-700 shadow-lg px-6 rounded-full'
+                : 'bg-gray-700 hover:bg-gray-600 shadow-lg px-6 rounded-full'}
+              onClick={toggleReady}
+            >
+              {readyPlayers.includes(userId) ? t('online.ready') : t('online.readyButton')}
+            </Button>
+          </div>
         )}
       </div>
     </div>

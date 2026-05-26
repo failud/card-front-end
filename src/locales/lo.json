@@ -75,7 +75,11 @@
     "joinButton": "ເຂົ້າຮ່ວມ",
     "refreshRooms": "ຣີເຟຣດ",
     "reconnectTimedOut": "ໝົດເວລາເຊື່ອມຕໍ່ໃໝ່ ຫ້ອງອາດໝົດອາຍຸແລ້ວ",
-    "roomExpired": "ຫ້ອງໝົດອາຍຸເນື່ອງຈາກບໍ່ມີກິດຈະກຳ"
+    "roomExpired": "ຫ້ອງໝົດອາຍຸເນື່ອງຈາກບໍ່ມີກິດຈະກຳ",
+    "backToLobby": "ກັບໄປ Lobby",
+    "ready": "ກຽມພ້ອມ",
+    "notReady": "ຍັງບໍ່ພ້ອມ",
+    "readyButton": "ກຽມພ້ອມ"
   },
   "profile": {
     "title": "ໂປຣໄຟລ໌",

@@ -144,8 +144,8 @@ function OpponentCard({
         {player.hand.length} {t("common.cards")}
       </span>
       <PlayedCards
-        records={isMobile ? history.slice(-1) : history}
-        fanned={!isMobile}
+        records={history.slice(-1)}
+        fanned={false}
       />
     </div>
   );
@@ -200,12 +200,6 @@ export default function GamePage() {
   const opponents = players.slice(1);
   const isHumanTurn =
     currentPlayerIndex === 0 && !humanPlayer?.lockedOut && !humanPlayer?.isOut;
-  const gridCols =
-    opponents.length <= 2
-      ? "grid-cols-2"
-      : opponents.length === 3
-        ? "grid-cols-2 sm:grid-cols-3"
-        : "grid-cols-2 sm:grid-cols-3";
 
   const handleTimeExpire = useCallback(() => {
     if (isHumanTurn) useGameStore.getState().pass();
@@ -277,9 +271,9 @@ export default function GamePage() {
           {/* History cards removed — now shown per player */}
           {/* </div> */}
 
-          {/* ── Opponents grid opposite main player ── */}
+          {/* ── Opponents at top, pinned to edges ── */}
           <div
-            className={`absolute top-0 left-0 right-0 z-20 grid ${gridCols} ${compact ? "gap-1 p-1" : "gap-3 p-4"} justify-items-center`}
+            className={`absolute top-0 left-0 right-0 z-20 grid grid-cols-2 ${compact ? "px-0.5 py-0.5" : isMobile ? "px-0.5 py-1" : "p-4"}`}
           >
             {opponents.map((opp, i) => {
               const isActive =
@@ -291,14 +285,18 @@ export default function GamePage() {
                 (r) => r.playerId === opp.id,
               );
               return (
-                <OpponentCard
+                <div
                   key={opp.id}
-                  player={opp}
-                  isActive={isActive}
-                  history={playerHistory}
-                  isMobile={isMobile}
-                  t={t}
-                />
+                  className={i % 2 === 0 ? "justify-self-start" : "justify-self-end"}
+                >
+                  <OpponentCard
+                    player={opp}
+                    isActive={isActive}
+                    history={playerHistory}
+                    isMobile={isMobile}
+                    t={t}
+                  />
+                </div>
               );
             })}
           </div>
@@ -700,10 +698,11 @@ export default function GamePage() {
                 <Button
                   className="flex-1 bg-red-600 hover:bg-red-700"
                   onClick={() => {
+                    const prevWinnerId = useGameStore.getState().winner;
                     resetGame();
                     useGameStore
                       .getState()
-                      .initGame(nickname, players.length - 1, coinValue);
+                      .initGame(nickname, players.length - 1, coinValue, prevWinnerId || undefined);
                   }}
                 >
                   {t("game.playAgain")}

@@ -6,6 +6,7 @@ import { Card, ArrangeMode } from '@/types';
 import { GameCard } from './card';
 import { Button } from '@/components/ui/button';
 import { useGameStore } from '@/stores/game-store';
+import { useViewportStore } from '@/stores/viewport-store';
 import { useToastStore } from '@/stores/toast-store';
 import { detectPlayType } from '@/lib/rules';
 import { useTranslations } from '@/lib/i18n';
@@ -82,6 +83,23 @@ export const PlayerHand = forwardRef<PlayerHandHandle, PlayerHandProps>(function
 
   const playCards = onPlay || storePlayCards;
   const pass = onPass || storePass;
+  const isMobile = useViewportStore((s) => s.isMobile);
+  const viewportWidth = useViewportStore((s) => s.width);
+
+  // Calculate card overlap so hand always stays in one row
+  const CARD_W = 48; // w-12 on mobile
+  const CARD_GAP = 6; // gap-1.5
+  const CONTAINER_PX = 20; // approximate padding of parent containers
+  const maxCardsNoOverlap = isMobile
+    ? Math.floor((viewportWidth - CONTAINER_PX) / (CARD_W + CARD_GAP))
+    : 99;
+  const needsOverlap = isMobile && cards.length > maxCardsNoOverlap;
+  const overlapPx = needsOverlap
+    ? Math.ceil(
+        (cards.length * (CARD_W + CARD_GAP) - (viewportWidth - CONTAINER_PX)) /
+          (cards.length - 1),
+      )
+    : 0;
 
   const errorMessages: Record<string, string> = {
     error_invalid_play: t('game.errorInvalidPlay'),
@@ -246,27 +264,39 @@ export const PlayerHand = forwardRef<PlayerHandHandle, PlayerHandProps>(function
         </div>
       </div>
 
-      {/* Cards */}
-      <div className="flex gap-1.5 flex-wrap justify-center">
-        {cards.map((card) => (
-          dragEnabled && isMyTurn ? (
-            <DraggableCard
-              key={card.id}
-              card={card}
-              selected={selectedIds.has(card.id)}
-              disabled={false}
-              onClick={() => toggleCard(card.id)}
-            />
+      {/* Cards — single row, overlapping when needed on mobile */}
+      <div
+        className="flex justify-center"
+        style={{
+          flexWrap: needsOverlap ? "nowrap" : "wrap",
+          gap: needsOverlap ? 0 : undefined,
+        }}
+      >
+        {cards.map((card, i) => {
+          const marginLeft =
+            i === 0 ? 0 : needsOverlap ? CARD_GAP - overlapPx : undefined;
+          const style: React.CSSProperties =
+            marginLeft !== undefined ? { marginLeft } : {};
+          return dragEnabled && isMyTurn ? (
+            <div key={card.id} style={style}>
+              <DraggableCard
+                card={card}
+                selected={selectedIds.has(card.id)}
+                disabled={false}
+                onClick={() => toggleCard(card.id)}
+              />
+            </div>
           ) : (
-            <GameCard
-              key={card.id}
-              card={card}
-              selected={selectedIds.has(card.id)}
-              onClick={() => toggleCard(card.id)}
-              disabled={!isMyTurn}
-            />
-          )
-        ))}
+            <div key={card.id} style={style}>
+              <GameCard
+                card={card}
+                selected={selectedIds.has(card.id)}
+                onClick={() => toggleCard(card.id)}
+                disabled={!isMyTurn}
+              />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -75,7 +75,11 @@
     "joinButton": "เข้าร่วม",
     "refreshRooms": "รีเฟรช",
     "reconnectTimedOut": "หมดเวลาเชื่อมต่อใหม่ ห้องอาจหมดอายุแล้ว",
-    "roomExpired": "ห้องหมดอายุเนื่องจากไม่มีกิจกรรม"
+    "roomExpired": "ห้องหมดอายุเนื่องจากไม่มีกิจกรรม",
+    "backToLobby": "กลับไป Lobby",
+    "ready": "พร้อม",
+    "notReady": "รอพร้อม",
+    "readyButton": "พร้อม"
   },
   "profile": {
     "title": "โปรไฟล์",
