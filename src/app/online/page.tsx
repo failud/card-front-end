@@ -28,7 +28,7 @@ export default function OnlinePage() {
   const {
     phase, roomCode, isHost, playerCount: storePlayerCount, players, error, isReconnecting,
     createRoom, joinRoom, leaveRoom, startGame, listenToEvents, setError, reconnectToRoom,
-    readyPlayers, playerReady,
+    readyPlayers, playerReady, lastWinnerId,
   } = useOnlineGameStore();
 
   const nonHostPlayers = players.filter((p) => p.id !== players[0]?.id && p.connected);
@@ -162,17 +162,29 @@ export default function OnlinePage() {
         {players.map((p, i) => {
           const isReady = readyPlayers.includes(p.id);
           return (
-            <div key={p.id} className="flex items-center gap-2 sm:gap-3 py-2 px-3 rounded bg-gray-800/50">
-              <span className="text-gray-400 text-sm w-5 sm:w-6">{i + 1}.</span>
-              <span className="text-white text-sm sm:text-base flex-1 truncate">{p.name}</span>
+            <div key={p.id} className={`flex items-center gap-2 sm:gap-3 py-2 px-3 rounded transition-colors ${
+              isReady ? 'bg-green-900/30 border border-green-800/40' : 'bg-gray-800/50'
+            }`}>
+              <span className="text-gray-400 text-sm w-5 sm:w-6 shrink-0">{i + 1}.</span>
+              <span className={`text-sm sm:text-base flex-1 truncate ${isReady ? 'text-green-200' : 'text-white'}`}>
+                {p.name}
+              </span>
               {p.id === players[0]?.id && (
                 <Badge className="bg-yellow-600/50 text-yellow-200 text-xs shrink-0">{t('online.host')}</Badge>
+              )}
+              {phase === 'game-over' && p.id === lastWinnerId && (
+                <Badge className="bg-yellow-500/80 text-yellow-950 text-[10px] shrink-0 font-bold tracking-wider">{t('online.lastWinner')}</Badge>
               )}
               {!p.connected && (
                 <Badge className="bg-red-600/50 text-red-200 text-xs shrink-0">{t('online.disconnected')}</Badge>
               )}
-              {p.connected && p.id !== userId && readyPlayers.length > 0 && (
-                <Badge className={isReady ? 'bg-green-600/50 text-green-200 text-xs shrink-0' : 'bg-gray-600/50 text-gray-400 text-xs shrink-0'}>
+              {p.connected && p.id !== players[0]?.id && (
+                <Badge className={`shrink-0 text-xs ${
+                  isReady
+                    ? 'bg-green-600/50 text-green-200'
+                    : 'bg-gray-600/50 text-gray-400'
+                }`}>
+                  <span className="mr-0.5">{isReady ? '✓' : '○'}</span>
                   {isReady ? t('online.ready') : t('online.notReady')}
                 </Badge>
               )}
@@ -431,7 +443,7 @@ export default function OnlinePage() {
         {/* Ready button at bottom right for non-host players */}
         {(phase === 'lobby' || phase === 'game-over') && roomCode &&
          userId !== players[0]?.id && (
-          <div className="fixed bottom-6 right-6 z-50">
+          <div className="fixed right-6 z-50">
             <Button
               size="lg"
               className={readyPlayers.includes(userId)

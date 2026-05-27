@@ -79,7 +79,9 @@
     "backToLobby": "กลับไป Lobby",
     "ready": "พร้อม",
     "notReady": "รอพร้อม",
-    "readyButton": "พร้อม"
+    "readyButton": "พร้อม",
+    "roomCode": "ห้อง:",
+    "lastWinner": "ชนะ"
   },
   "profile": {
     "title": "โปรไฟล์",

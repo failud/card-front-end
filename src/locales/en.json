@@ -79,7 +79,9 @@
     "backToLobby": "Back to Lobby",
     "ready": "Ready",
     "notReady": "Not Ready",
-    "readyButton": "Ready"
+    "readyButton": "Ready",
+    "roomCode": "Room:",
+    "lastWinner": "WIN"
   },
   "profile": {
     "title": "Profile",

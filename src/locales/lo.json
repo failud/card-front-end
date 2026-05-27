@@ -79,7 +79,9 @@
     "backToLobby": "ກັບໄປ Lobby",
     "ready": "ກຽມພ້ອມ",
     "notReady": "ຍັງບໍ່ພ້ອມ",
-    "readyButton": "ກຽມພ້ອມ"
+    "readyButton": "ກຽມພ້ອມ",
+    "roomCode": "ຫ້ອງ:",
+    "lastWinner": "ຊະນະ"
   },
   "profile": {
     "title": "ໂປຣໄຟລ໌",

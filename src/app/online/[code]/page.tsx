@@ -486,13 +486,6 @@ export default function OnlineGamePage({
                     </div>
                     <div className="flex gap-3">
                       <Button
-                        variant="outline"
-                        className="flex-1 border-gray-700 text-gray-300"
-                        onClick={() => {}}
-                      >
-                        {t("game.readyButton")}
-                      </Button>
-                      <Button
                         className="flex-1 bg-yellow-600 hover:bg-yellow-700"
                         onClick={handleInstantWin}
                       >

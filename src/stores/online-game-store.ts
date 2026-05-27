@@ -67,6 +67,8 @@ interface OnlineGameState {
   readyPlayers: string[];
   winner: string | null;
   winnerName: string | null;
+  lastWinnerId: string | null;
+  lastWinnerName: string | null;
   scores: Record<string, number> | null;
   payouts: Record<string, number> | null;
   winDetail: WinDetail | null;
@@ -121,6 +123,8 @@ const initialState: OnlineGameState = {
   readyPlayers: [],
   winner: null,
   winnerName: null,
+  lastWinnerId: null,
+  lastWinnerName: null,
   scores: null,
   payouts: null,
   winDetail: null,
@@ -136,37 +140,64 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
   createRoom: (playerCount: number, coinValue: number, isPrivate = false) => {
     const socket = getSocket();
     if (!socket) return;
-    socket.emit('create_room', { playerCount, coinValue, isPrivate }, (res: { ok?: boolean; error?: string; roomCode?: string }) => {
-      if (res.error) { set({ error: res.error }); return; }
-      const { nickname, userId } = useAuthStore.getState();
-      const rc = res.roomCode || '';
-      saveReconnectData({ roomCode: rc });
-      set({
-        roomCode: rc,
-        isHost: true,
-        phase: 'lobby',
-        players: [{ id: userId, name: nickname, connected: true }],
-        error: null,
+
+    const doCreate = () => {
+      clearReconnectData();
+      socket.emit('create_room', { playerCount, coinValue, isPrivate }, (res: { ok?: boolean; error?: string; roomCode?: string }) => {
+        if (res.error) { set({ error: res.error }); return; }
+        const { nickname, userId } = useAuthStore.getState();
+        const rc = res.roomCode || '';
+        saveReconnectData({ roomCode: rc });
+        set({
+          roomCode: rc,
+          isHost: true,
+          phase: 'lobby',
+          players: [{ id: userId, name: nickname, connected: true }],
+          lastWinnerId: null,
+          lastWinnerName: null,
+          error: null,
+        });
       });
-    });
+    };
+
+    // Leave any stale room first so the server releases the player slot
+    const data = loadReconnectData();
+    if (data?.roomCode) {
+      socket.emit('leave_room', { roomCode: data.roomCode }, doCreate);
+    } else {
+      doCreate();
+    }
   },
 
   joinRoom: (roomCode: string) => {
     const socket = getSocket();
     if (!socket) return;
-    socket.emit('join_room', { roomCode }, (res: { ok?: boolean; error?: string; roomCode?: string }) => {
-      if (res.error) { set({ error: res.error }); return; }
-      const { nickname, userId } = useAuthStore.getState();
-      const rc = res.roomCode || roomCode.toUpperCase();
-      saveReconnectData({ roomCode: rc });
-      set((s) => ({
-        roomCode: rc,
-        isHost: false,
-        phase: 'lobby',
-        players: s.players.some((p) => p.id === userId) ? s.players : [...s.players, { id: userId, name: nickname, connected: true }],
-        error: null,
-      }));
-    });
+
+    const doJoin = () => {
+      socket.emit('join_room', { roomCode }, (res: { ok?: boolean; error?: string; roomCode?: string }) => {
+        if (res.error) { set({ error: res.error }); return; }
+        const { nickname, userId } = useAuthStore.getState();
+        const rc = res.roomCode || roomCode.toUpperCase();
+        saveReconnectData({ roomCode: rc });
+        set((s) => ({
+          roomCode: rc,
+          isHost: false,
+          phase: 'lobby',
+          players: s.players.some((p) => p.id === userId) ? s.players : [...s.players, { id: userId, name: nickname, connected: true }],
+          lastWinnerId: null,
+          lastWinnerName: null,
+          error: null,
+        }));
+      });
+    };
+
+    // Leave any stale room first so the server releases the player slot
+    const data = loadReconnectData();
+    if (data?.roomCode) {
+      socket.emit('leave_room', { roomCode: data.roomCode }, doJoin);
+    } else {
+      doJoin();
+    }
   },
 
   leaveRoom: () => {
@@ -189,6 +220,8 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
 
     set({ isReconnecting: true });
 
+    const targetCode = data.roomCode;
+
     const timeoutId = setTimeout(() => {
       const state = get();
       if (state.isReconnecting) {
@@ -197,11 +230,14 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
       }
     }, 5000);
 
-    socket.emit('join_room', { roomCode: data.roomCode }, (res: { ok?: boolean; error?: string }) => {
+    socket.emit('join_room', { roomCode: targetCode }, (res: { ok?: boolean; error?: string }) => {
       clearTimeout(timeoutId);
       if (res.error) {
+        // Server rejected (room expired / player already in room) — tell server
+        // to release the old room association so the player can create/join a new one
+        socket.emit('leave_room', { roomCode: targetCode });
         clearReconnectData();
-        set({ isReconnecting: false, error: res.error });
+        set({ isReconnecting: false, roomCode: '', phase: 'idle', error: null });
         return;
       }
       set({ isReconnecting: false });
@@ -307,6 +343,8 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
         gameHistory: [],
         winner: null,
         winnerName: null,
+        lastWinnerId: null,
+        lastWinnerName: null,
         scores: null,
         payouts: null,
         winDetail: null,
@@ -398,6 +436,8 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
         phase: 'game-over',
         winner: data.winner,
         winnerName: data.winnerName,
+        lastWinnerId: data.winner,
+        lastWinnerName: data.winnerName,
         scores: data.scores,
         payouts: data.payouts,
         winDetail: data.winDetail,
@@ -414,7 +454,7 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
     });
   },
 
-  reset: () => set({ ...initialState }),
+  reset: () => set((s) => ({ ...initialState, lastWinnerId: s.lastWinnerId, lastWinnerName: s.lastWinnerName })),
 
   setError: (error: string | null) => set({ error }),
 }));
