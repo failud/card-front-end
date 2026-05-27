@@ -75,6 +75,7 @@ interface OnlineGameState {
   coinValue: number;
   error: string | null;
   isReconnecting: boolean;
+  reconnectFailed: boolean;
   arrangeMode: ArrangeMode | null;
 }
 
@@ -131,6 +132,7 @@ const initialState: OnlineGameState = {
   coinValue: 1,
   error: null,
   isReconnecting: false,
+  reconnectFailed: false,
   arrangeMode: null,
 };
 
@@ -155,6 +157,7 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
           players: [{ id: userId, name: nickname, connected: true }],
           lastWinnerId: null,
           lastWinnerName: null,
+          reconnectFailed: false,
           error: null,
         });
       });
@@ -186,7 +189,7 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
           players: s.players.some((p) => p.id === userId) ? s.players : [...s.players, { id: userId, name: nickname, connected: true }],
           lastWinnerId: null,
           lastWinnerName: null,
-          error: null,
+          reconnectFailed: false,
         }));
       });
     };
@@ -221,27 +224,45 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
     set({ isReconnecting: true });
 
     const targetCode = data.roomCode;
+    let retries = 0;
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 1500;
 
-    const timeoutId = setTimeout(() => {
+    const overallTimeoutId = setTimeout(() => {
       const state = get();
       if (state.isReconnecting) {
-        clearReconnectData();
-        set({ isReconnecting: false, error: 'Reconnection timed out' });
-      }
-    }, 5000);
-
-    socket.emit('join_room', { roomCode: targetCode }, (res: { ok?: boolean; error?: string }) => {
-      clearTimeout(timeoutId);
-      if (res.error) {
-        // Server rejected (room expired / player already in room) — tell server
-        // to release the old room association so the player can create/join a new one
+        // All retries exhausted — release stale room so player can create/join
         socket.emit('leave_room', { roomCode: targetCode });
         clearReconnectData();
         set({ isReconnecting: false, roomCode: '', phase: 'idle', error: null });
-        return;
       }
-      set({ isReconnecting: false });
-    });
+    }, 10000);
+
+    const attempt = () => {
+      socket.emit('join_room', { roomCode: targetCode }, (res: { ok?: boolean; error?: string }) => {
+        const state = get();
+        if (!state.isReconnecting) return; // Already handled by overall timeout
+
+        if (!res.error) {
+          clearTimeout(overallTimeoutId);
+          set({ isReconnecting: false, reconnectFailed: false });
+          return;
+        }
+
+        retries++;
+        if (retries < MAX_RETRIES) {
+          setTimeout(attempt, RETRY_DELAY);
+        } else {
+          // All retries failed — clean up stale room state
+          clearTimeout(overallTimeoutId);
+          socket.emit('leave_room', { roomCode: targetCode });
+          clearReconnectData();
+          set({ isReconnecting: false, reconnectFailed: true, roomCode: '', phase: 'idle', error: null });
+        }
+      });
+    };
+
+    attempt();
   },
 
   startGame: () => {
@@ -325,6 +346,7 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
         phase: room.phase as OnlinePhase,
         isHost: room.hostId === myId,
         readyPlayers: room.readyPlayers,
+        reconnectFailed: false,
         error: null,
       });
     });

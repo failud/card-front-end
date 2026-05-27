@@ -74,6 +74,7 @@
     "playersInRoom": "{current}/{max} ผู้เล่น",
     "joinButton": "เข้าร่วม",
     "refreshRooms": "รีเฟรช",
+    "reconnectFailed": "ไม่สามารถเชื่อมต่อกลับไปห้องเดิมได้ กรุณาสร้างห้องใหม่หรือเข้าร่วมห้องอื่น",
     "reconnectTimedOut": "หมดเวลาเชื่อมต่อใหม่ ห้องอาจหมดอายุแล้ว",
     "roomExpired": "ห้องหมดอายุเนื่องจากไม่มีกิจกรรม",
     "backToLobby": "กลับไป Lobby",

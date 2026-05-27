@@ -74,6 +74,7 @@
     "playersInRoom": "{current}/{max} players",
     "joinButton": "Join",
     "refreshRooms": "Refresh",
+    "reconnectFailed": "Could not reconnect to your previous room. Create a new room or join another.",
     "reconnectTimedOut": "Reconnection timed out. The room may have expired.",
     "roomExpired": "Room has expired due to inactivity.",
     "backToLobby": "Back to Lobby",

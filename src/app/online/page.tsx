@@ -28,7 +28,7 @@ export default function OnlinePage() {
   const {
     phase, roomCode, isHost, playerCount: storePlayerCount, players, error, isReconnecting,
     createRoom, joinRoom, leaveRoom, startGame, listenToEvents, setError, reconnectToRoom,
-    readyPlayers, playerReady, lastWinnerId,
+    readyPlayers, playerReady, lastWinnerId, reconnectFailed,
   } = useOnlineGameStore();
 
   const nonHostPlayers = players.filter((p) => p.id !== players[0]?.id && p.connected);
@@ -108,6 +108,18 @@ export default function OnlinePage() {
       router.push(`/online/${roomCode}`);
     }
   }, [phase, roomCode, router]);
+
+  // Auto-open create form when reconnection to previous room fails
+  useEffect(() => {
+    if (reconnectFailed) {
+      setShowCreate(true);
+    }
+  }, [reconnectFailed]);
+
+  const dismissReconnectBanner = () => {
+    setShowCreate(false);
+    useOnlineGameStore.setState({ reconnectFailed: false });
+  };
 
   const handleCreateRoom = () => {
     createRoom(localPlayerCount, COIN_LEVELS[coinLevel].value, isPrivate);
@@ -208,6 +220,17 @@ export default function OnlinePage() {
 
   const renderForms = () => (
     <div className="space-y-6 max-w-xl mx-auto">
+      {reconnectFailed && (
+        <div className="flex items-center justify-between bg-yellow-600/20 border border-yellow-600/30 rounded-lg px-4 py-3">
+          <p className="text-yellow-200 text-sm">{t('online.reconnectFailed')}</p>
+          <button
+            className="text-yellow-400 hover:text-yellow-200 text-lg leading-none ml-3"
+            onClick={dismissReconnectBanner}
+          >
+            ×
+          </button>
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         {/* Create Room */}
         <Card className="bg-gray-900 border-gray-800">

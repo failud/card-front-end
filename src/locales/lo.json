@@ -74,6 +74,7 @@
     "playersInRoom": "{current}/{max} ຜູ້ຫຼິ້ນ",
     "joinButton": "ເຂົ້າຮ່ວມ",
     "refreshRooms": "ຣີເຟຣດ",
+    "reconnectFailed": "ບໍ່ສາມາດເຊື່ອມຕໍ່ກັບຫ້ອງເກົ່າໄດ້ ກະລຸນາສ້າງຫ້ອງໃໝ່ ຫຼື ເຂົ້າຮ່ວມຫ້ອງອື່ນ",
     "reconnectTimedOut": "ໝົດເວລາເຊື່ອມຕໍ່ໃໝ່ ຫ້ອງອາດໝົດອາຍຸແລ້ວ",
     "roomExpired": "ຫ້ອງໝົດອາຍຸເນື່ອງຈາກບໍ່ມີກິດຈະກຳ",
     "backToLobby": "ກັບໄປ Lobby",
