@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Card as CardType } from '@/types';
 import { SUIT_SYMBOLS } from '@/types';
 import { cn } from '@/lib/utils';
@@ -33,13 +34,34 @@ export function GameCard({ card, selected, onClick, disabled, size = 'lg', insta
   const map = isMobile ? sizeMap : sizeMapDesktop;
   const { card: cardClass, suit: suitClass } = map[size];
 
+  // Sparkle particles rising from combo cards
+  const sparkles = useMemo(() => {
+    if (!comboLevel) return [];
+    const count = comboLevel === 3 ? 8 : comboLevel === 2 ? 6 : 4;
+    const color = comboLevel === 1 ? '#60a5fa' : comboLevel === 2 ? '#a78bfa' : '#c084fc';
+    const starColor = comboLevel === 3 ? '#f0abfc' : comboLevel === 2 ? '#c4b5fd' : '#93c5fd';
+    const items: { x: number; delay: number; duration: number; size: number; color: string; isStar: boolean }[] = [];
+    for (let i = 0; i < count; i++) {
+      const isStar = (comboLevel >= 2 && i % 2 === 0) || (comboLevel === 3 && i % 3 === 0);
+      items.push({
+        x: 8 + (i * 17 + 5) % 84,
+        delay: (i * 0.35) % 1.8,
+        duration: 1.0 + (i % 4) * 0.25,
+        size: isStar ? 2 + (i % 3) : 2 + (i % 2),
+        color: isStar ? starColor : color,
+        isStar,
+      });
+    }
+    return items;
+  }, [comboLevel]);
+
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       className={cn(
         cardClass,
-        'rounded-lg flex flex-col items-center justify-center font-bold shadow-md transition-all',
+        'rounded-lg flex flex-col items-center justify-center font-bold shadow-md transition-all relative overflow-hidden',
         'bg-white text-black border-2',
         selected
           ? 'border-yellow-400 -translate-y-2 shadow-yellow-400/30 shadow-lg'
@@ -62,6 +84,29 @@ export function GameCard({ card, selected, onClick, disabled, size = 'lg', insta
       <span className={cn(isRed ? 'text-red-500' : 'text-black', suitClass)}>
         {SUIT_SYMBOLS[card.suit]}
       </span>
+
+      {/* Sparkle overlay */}
+      {sparkles.length > 0 && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-lg z-10">
+          {sparkles.map((sp, i) => (
+            <span
+              key={i}
+              className="absolute"
+              style={{
+                left: `${sp.x}%`,
+                bottom: '0%',
+                width: sp.isStar ? `${sp.size * 2.5}px` : `${sp.size}px`,
+                height: sp.isStar ? `${sp.size * 2.5}px` : `${sp.size}px`,
+                background: sp.color,
+                animation: `sparkle-up ${sp.duration}s ease-out ${sp.delay}s infinite`,
+                opacity: 0,
+                borderRadius: sp.isStar ? '2px' : '50%',
+                clipPath: sp.isStar ? 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)' : undefined,
+              }}
+            />
+          ))}
+        </div>
+      )}
     </button>
   );
 }
