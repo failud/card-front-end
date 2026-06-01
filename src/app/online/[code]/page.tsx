@@ -304,8 +304,6 @@ export default function OnlineGamePage({
     );
   }
 
-  const isInstantWinReady = phase === "ready-check" && showInstantWin;
-
   return (
     <DndContext
       onDragStart={(event: DragStartEvent) => {
@@ -454,58 +452,18 @@ export default function OnlineGamePage({
           </div>
 
           {/* ── Ready Check overlay ── */}
-          {(phase === "ready-check" || isInstantWinReady) && (
+          {phase === "ready-check" && !showInstantWin && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 rounded-[45%]">
               <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 max-w-sm w-full mx-2 sm:mx-4 max-h-[85vh] overflow-y-auto">
-                {isInstantWinReady ? (
-                  <>
-                    <h2 className="text-xl font-bold text-white mb-3">
-                      {t("game.instantWinTitle")}
-                    </h2>
-                    <div className="space-y-2 mb-6">
-                      {instantWinResults.map((r, i) => (
-                        <div key={i} className="flex justify-between text-sm">
-                          <span className="text-gray-300">
-                            {t(`instantWinNames.${r.name}`, {
-                              defaultValue: r.name,
-                            })}
-                          </span>
-                          <Badge className="bg-yellow-600">
-                            {r.points} {t("common.points")}
-                          </Badge>
-                        </div>
-                      ))}
-                      <Separator className="bg-gray-700 my-2" />
-                      <div className="flex justify-between font-bold text-white">
-                        <span>{t("game.totalPoints")}</span>
-                        <span>
-                          {instantWinResults.reduce((s, r) => s + r.points, 0)}{" "}
-                          {t("common.points")}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <Button
-                        className="flex-1 bg-yellow-600 hover:bg-yellow-700"
-                        onClick={handleInstantWin}
-                      >
-                        {t("game.instantWinButton")}
-                      </Button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <h2 className="text-xl font-bold text-white mb-3 text-center">
-                      {t("common.gameName")}
-                    </h2>
-                    <p className="text-gray-400 text-center mb-2">
-                      {t("game.noInstantWin")}
-                    </p>
-                    <p className="text-gray-500 text-sm text-center mb-6">
-                      {t("game.readyPrompt")}
-                    </p>
-                  </>
-                )}
+                <h2 className="text-xl font-bold text-white mb-3 text-center">
+                  {t("common.gameName")}
+                </h2>
+                <p className="text-gray-400 text-center mb-2">
+                  {t("game.noInstantWin")}
+                </p>
+                <p className="text-gray-500 text-sm text-center mb-6">
+                  {t("game.readyPrompt")}
+                </p>
               </div>
             </div>
           )}
@@ -526,6 +484,9 @@ export default function OnlineGamePage({
               onPlay={handlePlay}
               onPass={handlePass}
               onArrange={arrangeHand}
+              instantWinAvailable={showInstantWin && isMyTurn && phase === "playing"}
+              instantWinResults={showInstantWin ? instantWinResults : undefined}
+              onInstantWin={handleInstantWin}
             />
           )}
           {phase !== "playing" && phase !== "ready-check" && (

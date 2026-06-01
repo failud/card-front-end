@@ -150,10 +150,10 @@ export function checkInstantWin(hand: Card[], centralCard: Card | null): Instant
   for (const c of hand) rankCounts.set(String(c.rank), [...(rankCounts.get(String(c.rank)) || []), c]);
   for (const [, cards] of rankCounts) {
     if (cards.length === 4) {
-      results.push({ type: 'A', name: 'four_of_a_kind', points: 5, canUseCentral: false });
+      results.push({ type: 'A', name: 'four_of_a_kind', points: 5, canUseCentral: false, cardIds: cards.map((c) => c.id) });
     }
     if (cards.length === 3 && centralCard && cards[0].rank === centralCard.rank) {
-      results.push({ type: 'A', name: 'four_of_a_kind', points: 5, canUseCentral: true });
+      results.push({ type: 'A', name: 'four_of_a_kind', points: 5, canUseCentral: true, cardIds: [...cards.map((c) => c.id), centralCard.id] });
     }
   }
 
@@ -165,7 +165,7 @@ export function checkInstantWin(hand: Card[], centralCard: Card | null): Instant
     for (let i = 0; i <= sorted.length - 4; i++) {
       const slice = sorted.slice(i, i + 4);
       if (isConsecutive(slice)) {
-        results.push({ type: 'A', name: 'four_straight_flush', points: 5, canUseCentral: false });
+        results.push({ type: 'A', name: 'four_straight_flush', points: 5, canUseCentral: false, cardIds: slice.map((c) => c.id) });
       }
     }
     if (centralCard && centralCard.suit === cards[0].suit) {
@@ -173,7 +173,7 @@ export function checkInstantWin(hand: Card[], centralCard: Card | null): Instant
       for (let i = 0; i <= withCentral.length - 4; i++) {
         const slice = withCentral.slice(i, i + 4);
         if (isConsecutive(slice) && slice.some((c) => c.id === centralCard.id)) {
-          results.push({ type: 'A', name: 'four_straight_flush', points: 5, canUseCentral: true });
+          results.push({ type: 'A', name: 'four_straight_flush', points: 5, canUseCentral: true, cardIds: slice.map((c) => c.id) });
         }
       }
     }
@@ -193,7 +193,7 @@ export function checkInstantWin(hand: Card[], centralCard: Card | null): Instant
     }
   }
   if (goodPairs.length >= 3) {
-    results.push({ type: 'B', name: 'three_good_pairs', points: 5, canUseCentral: false });
+    results.push({ type: 'B', name: 'three_good_pairs', points: 5, canUseCentral: false, cardIds: goodPairs.slice(0, 3).flat().map((c) => c.id) });
   }
 
   // Type B: 4 Bad Pairs
@@ -210,25 +210,25 @@ export function checkInstantWin(hand: Card[], centralCard: Card | null): Instant
     }
   }
   if (badPairs.length >= 4) {
-    results.push({ type: 'B', name: 'four_bad_pairs', points: 5, canUseCentral: false });
+    results.push({ type: 'B', name: 'four_bad_pairs', points: 5, canUseCentral: false, cardIds: badPairs.slice(0, 4).flat().map((c) => c.id) });
   }
 
   // Type B: 5 Face cards (J, Q, K)
   const faceCards = hand.filter((c) => c.rank === 'J' || c.rank === 'Q' || c.rank === 'K');
   if (faceCards.length >= 5) {
-    results.push({ type: 'B', name: 'five_face_cards', points: 5, canUseCentral: false });
+    results.push({ type: 'B', name: 'five_face_cards', points: 5, canUseCentral: false, cardIds: faceCards.slice(0, 5).map((c) => c.id) });
   }
 
   // Type B: Triple 2
   const twos = hand.filter((c) => c.rank === '2');
   if (twos.length >= 3) {
-    results.push({ type: 'B', name: 'triple_two', points: twos.length === 4 ? 10 : 5, canUseCentral: false });
+    results.push({ type: 'B', name: 'triple_two', points: twos.length === 4 ? 10 : 5, canUseCentral: false, cardIds: twos.map((c) => c.id) });
   }
 
   // Type B: 6 cards of same suit
   for (const [, cards] of suitGroups) {
     if (cards.length >= 6) {
-      results.push({ type: 'B', name: 'six_same_suit', points: 5, canUseCentral: false });
+      results.push({ type: 'B', name: 'six_same_suit', points: 5, canUseCentral: false, cardIds: cards.slice(0, 6).map((c) => c.id) });
     }
   }
 
@@ -238,7 +238,7 @@ export function checkInstantWin(hand: Card[], centralCard: Card | null): Instant
     return v >= getCardRankValue('10' as Card['rank']) && v <= getCardRankValue('K' as Card['rank']);
   });
   if (!hasHighCards) {
-    results.push({ type: 'B', name: 'under_ten_hand', points: 5, canUseCentral: false });
+    results.push({ type: 'B', name: 'under_ten_hand', points: 5, canUseCentral: false, cardIds: hand.map((c) => c.id) });
   }
 
   return results;

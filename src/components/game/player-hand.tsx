@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useRef, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { useDraggable } from '@dnd-kit/core';
-import { Card, ArrangeMode } from '@/types';
+import { Card, ArrangeMode, InstantWinResult } from '@/types';
 import { GameCard } from './card';
 import { Button } from '@/components/ui/button';
 import { useGameStore } from '@/stores/game-store';
@@ -28,6 +28,12 @@ interface PlayerHandProps {
   onPlay?: (cards: Card[]) => string | void;
   /** Online mode: called instead of game-store.pass */
   onPass?: () => string | void;
+  /** Show gold instant-win button */
+  instantWinAvailable?: boolean;
+  /** Instant-win results (card IDs for gold highlighting) */
+  instantWinResults?: InstantWinResult[];
+  /** Called when instant-win button is pressed */
+  onInstantWin?: () => void;
 }
 
 const arrangeModes: { mode: ArrangeMode; labelKey: string }[] = [
@@ -42,11 +48,13 @@ function DraggableCard({
   selected,
   disabled,
   onClick,
+  instantWinAvailable,
 }: {
   card: Card;
   selected: boolean;
   disabled: boolean;
   onClick: () => void;
+  instantWinAvailable?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: card.id,
@@ -64,13 +72,14 @@ function DraggableCard({
         card={card}
         selected={selected || isDragging}
         disabled={disabled}
+        instantWinAvailable={instantWinAvailable}
       />
     </div>
   );
 }
 
 export const PlayerHand = forwardRef<PlayerHandHandle, PlayerHandProps>(function PlayerHand(
-  { cards, isMyTurn, currentPlay, onArrange, time = 0, onPlay, onPass },
+  { cards, isMyTurn, currentPlay, onArrange, time = 0, onPlay, onPass, instantWinAvailable, instantWinResults, onInstantWin },
   ref,
 ) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -148,6 +157,12 @@ export const PlayerHand = forwardRef<PlayerHandHandle, PlayerHandProps>(function
   const selectedCards = cards.filter((c) => selectedIds.has(c.id));
   const playType = detectPlayType(selectedCards);
   const canPlay = selectedCards.length > 0 && playType !== null;
+
+  // Collect all card IDs that form instant win combinations
+  const iwCardIds = useMemo(() => {
+    if (!instantWinResults?.length) return new Set<string>();
+    return new Set(instantWinResults.flatMap((r) => r.cardIds));
+  }, [instantWinResults]);
 
   const handlePlay = () => {
     if (!canPlay) {
@@ -252,6 +267,14 @@ export const PlayerHand = forwardRef<PlayerHandHandle, PlayerHandProps>(function
               ) : (
                 <span className="text-[10px] sm:text-xs text-yellow-500 self-center">{t('game.leadPrompt')}</span>
               )}
+              {instantWinAvailable && (
+                <Button
+                  className="bg-yellow-500 hover:bg-yellow-600 text-black h-11 sm:h-10 w-16 sm:w-20 text-base sm:text-lg font-bold rounded-xl"
+                  onClick={onInstantWin}
+                >
+                  Win
+                </Button>
+              )}
               <Button
                 className="bg-red-600 hover:bg-red-700 h-11 sm:h-10 w-16 sm:w-20 text-base sm:text-lg font-bold rounded-xl"
                 disabled={!canPlay}
@@ -277,6 +300,7 @@ export const PlayerHand = forwardRef<PlayerHandHandle, PlayerHandProps>(function
             i === 0 ? 0 : needsOverlap ? CARD_GAP - overlapPx : undefined;
           const style: React.CSSProperties =
             marginLeft !== undefined ? { marginLeft } : {};
+          const isIwCard = instantWinAvailable && iwCardIds.has(card.id);
           return dragEnabled && isMyTurn ? (
             <div key={card.id} style={style}>
               <DraggableCard
@@ -284,6 +308,7 @@ export const PlayerHand = forwardRef<PlayerHandHandle, PlayerHandProps>(function
                 selected={selectedIds.has(card.id)}
                 disabled={false}
                 onClick={() => toggleCard(card.id)}
+                instantWinAvailable={isIwCard}
               />
             </div>
           ) : (
@@ -293,6 +318,7 @@ export const PlayerHand = forwardRef<PlayerHandHandle, PlayerHandProps>(function
                 selected={selectedIds.has(card.id)}
                 onClick={() => toggleCard(card.id)}
                 disabled={!isMyTurn}
+                instantWinAvailable={isIwCard}
               />
             </div>
           );

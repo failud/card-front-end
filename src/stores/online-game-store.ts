@@ -386,11 +386,7 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
     });
 
     socket.on('instant_win_check', (data: { results: InstantWinResult[] }) => {
-      if (data.results.length > 0) {
-        set({ instantWinResults: data.results, showInstantWin: true, phase: 'ready-check' });
-      } else {
-        set({ instantWinResults: [], showInstantWin: false });
-      }
+      set({ instantWinResults: data.results, showInstantWin: data.results.length > 0 });
     });
 
     socket.on('your_turn', (data: { playerId: string; playerName: string; currentPlay: PlayRecord | null; timer: number }) => {
@@ -400,7 +396,6 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
         currentPlay: data.currentPlay,
         timer: data.timer,
         phase: 'playing',
-        showInstantWin: false,
         error: null,
       });
     });
@@ -419,6 +414,8 @@ const onlineGameStore = create<OnlineGameStore>((set, get) => ({
         ),
         // Remove played cards from own hand
         hand: data.playerId === myId ? s.hand.filter((c) => !playedIds.has(c.id)) : s.hand,
+        // Clear instant win once I play cards
+        ...(data.playerId === myId ? { instantWinResults: [], showInstantWin: false } : {}),
       }));
     });
 

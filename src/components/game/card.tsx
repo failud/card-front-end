@@ -11,6 +11,7 @@ interface CardProps {
   onClick?: () => void;
   disabled?: boolean;
   size?: 'sm' | 'md' | 'lg';
+  instantWinAvailable?: boolean;
 }
 
 const sizeMap = {
@@ -25,7 +26,7 @@ const sizeMapDesktop = {
   lg: { card: 'w-18 h-28 text-2xl', suit: 'text-5xl' },
 };
 
-export function GameCard({ card, selected, onClick, disabled, size = 'lg' }: CardProps) {
+export function GameCard({ card, selected, onClick, disabled, size = 'lg', instantWinAvailable }: CardProps) {
   const isRed = card.color === 'red';
   const { isMobile } = useViewportStore();
   const map = isMobile ? sizeMap : sizeMapDesktop;
@@ -41,7 +42,9 @@ export function GameCard({ card, selected, onClick, disabled, size = 'lg' }: Car
         'bg-white text-black border-2',
         selected
           ? 'border-yellow-400 -translate-y-2 shadow-yellow-400/30 shadow-lg'
-          : 'border-gray-300 hover:border-gray-400',
+          : instantWinAvailable
+            ? 'border-yellow-400 shadow-yellow-400/40 shadow-lg'
+            : 'border-gray-300 hover:border-gray-400',
         disabled && 'opacity-50 cursor-not-allowed',
         !disabled && 'cursor-pointer hover:-translate-y-1',
       )}

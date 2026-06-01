@@ -43,6 +43,7 @@ export interface InstantWinResult {
   name: string;
   points: number;
   canUseCentral: boolean;
+  cardIds: string[];
 }
 
 export interface GameResult {
