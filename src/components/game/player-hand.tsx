@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useGameStore } from '@/stores/game-store';
 import { useViewportStore } from '@/stores/viewport-store';
 import { useToastStore } from '@/stores/toast-store';
-import { detectPlayType } from '@/lib/rules';
+import { detectPlayType, isConsecutive, getCardRankValue } from '@/lib/rules';
 import { useTranslations } from '@/lib/i18n';
 import { TURN_TIME_SECONDS } from '@/lib/constants';
 
@@ -49,12 +49,14 @@ function DraggableCard({
   disabled,
   onClick,
   instantWinAvailable,
+  comboLevel,
 }: {
   card: Card;
   selected: boolean;
   disabled: boolean;
   onClick: () => void;
   instantWinAvailable?: boolean;
+  comboLevel?: number;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: card.id,
@@ -73,6 +75,7 @@ function DraggableCard({
         selected={selected || isDragging}
         disabled={disabled}
         instantWinAvailable={instantWinAvailable}
+        comboLevel={comboLevel}
       />
     </div>
   );
@@ -163,6 +166,73 @@ export const PlayerHand = forwardRef<PlayerHandHandle, PlayerHandProps>(function
     if (!instantWinResults?.length) return new Set<string>();
     return new Set(instantWinResults.flatMap((r) => r.cardIds));
   }, [instantWinResults]);
+
+  // Detect playable combos in hand (pairs, triples, etc.) for visual effects
+  const comboLevels = useMemo(() => {
+    const levels = new Map<string, number>();
+
+    // Group by rank
+    const rankGroups = new Map<string, Card[]>();
+    for (const c of cards) {
+      const key = String(c.rank);
+      rankGroups.set(key, [...(rankGroups.get(key) || []), c]);
+    }
+    for (const [, group] of rankGroups) {
+      if (group.length === 3) {
+        // Triple — strongest, level 2
+        for (const c of group) levels.set(c.id, Math.max(levels.get(c.id) || 0, 2));
+      } else if (group.length === 2 && group[0].color === group[1].color) {
+        // Good pair — level 1
+        for (const c of group) levels.set(c.id, Math.max(levels.get(c.id) || 0, 1));
+      }
+    }
+
+    // Group by suit for straight flush
+    const suitGroups = new Map<string, Card[]>();
+    for (const c of cards) suitGroups.set(c.suit, [...(suitGroups.get(c.suit) || []), c]);
+    for (const [, group] of suitGroups) {
+      if (group.length >= 3) {
+        const sorted = [...group].sort((a, b) => getCardRankValue(a.rank) - getCardRankValue(b.rank));
+        for (let i = 0; i <= sorted.length - 3; i++) {
+          const slice = sorted.slice(i, i + 3);
+          if (isConsecutive(slice)) {
+            if (slice.length >= 4) {
+              for (const c of slice) levels.set(c.id, Math.max(levels.get(c.id) || 0, 3));
+            } else {
+              for (const c of slice) levels.set(c.id, Math.max(levels.get(c.id) || 0, 2));
+            }
+          }
+        }
+      }
+    }
+
+    // Two straight good pairs (4 cards forming 2 consecutive good pairs)
+    const goodPairs: Card[][] = [];
+    const usedForPairs = new Set<string>();
+    for (let i = 0; i < cards.length; i++) {
+      for (let j = i + 1; j < cards.length; j++) {
+        if (usedForPairs.has(cards[i].id) || usedForPairs.has(cards[j].id)) continue;
+        if (cards[i].rank === cards[j].rank && cards[i].color === cards[j].color) {
+          goodPairs.push([cards[i], cards[j]]);
+          usedForPairs.add(cards[i].id);
+          usedForPairs.add(cards[j].id);
+        }
+      }
+    }
+    if (goodPairs.length >= 2) {
+      for (let i = 0; i < goodPairs.length; i++) {
+        for (let j = i + 1; j < goodPairs.length; j++) {
+          if (Math.abs(getCardRankValue(goodPairs[i][0].rank) - getCardRankValue(goodPairs[j][0].rank)) === 1) {
+            for (const c of [...goodPairs[i], ...goodPairs[j]]) {
+              levels.set(c.id, Math.max(levels.get(c.id) || 0, 3));
+            }
+          }
+        }
+      }
+    }
+
+    return levels;
+  }, [cards]);
 
   const handlePlay = () => {
     if (!canPlay) {
@@ -301,6 +371,7 @@ export const PlayerHand = forwardRef<PlayerHandHandle, PlayerHandProps>(function
           const style: React.CSSProperties =
             marginLeft !== undefined ? { marginLeft } : {};
           const isIwCard = instantWinAvailable && iwCardIds.has(card.id);
+          const cl = comboLevels.get(card.id) || 0;
           return dragEnabled && isMyTurn ? (
             <div key={card.id} style={style}>
               <DraggableCard
@@ -309,6 +380,7 @@ export const PlayerHand = forwardRef<PlayerHandHandle, PlayerHandProps>(function
                 disabled={false}
                 onClick={() => toggleCard(card.id)}
                 instantWinAvailable={isIwCard}
+                comboLevel={cl}
               />
             </div>
           ) : (
@@ -319,6 +391,7 @@ export const PlayerHand = forwardRef<PlayerHandHandle, PlayerHandProps>(function
                 onClick={() => toggleCard(card.id)}
                 disabled={!isMyTurn}
                 instantWinAvailable={isIwCard}
+                comboLevel={cl}
               />
             </div>
           );

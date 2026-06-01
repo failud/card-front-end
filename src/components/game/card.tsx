@@ -12,6 +12,7 @@ interface CardProps {
   disabled?: boolean;
   size?: 'sm' | 'md' | 'lg';
   instantWinAvailable?: boolean;
+  comboLevel?: number;
 }
 
 const sizeMap = {
@@ -26,7 +27,7 @@ const sizeMapDesktop = {
   lg: { card: 'w-18 h-28 text-2xl', suit: 'text-5xl' },
 };
 
-export function GameCard({ card, selected, onClick, disabled, size = 'lg', instantWinAvailable }: CardProps) {
+export function GameCard({ card, selected, onClick, disabled, size = 'lg', instantWinAvailable, comboLevel = 0 }: CardProps) {
   const isRed = card.color === 'red';
   const { isMobile } = useViewportStore();
   const map = isMobile ? sizeMap : sizeMapDesktop;
@@ -44,7 +45,13 @@ export function GameCard({ card, selected, onClick, disabled, size = 'lg', insta
           ? 'border-yellow-400 -translate-y-2 shadow-yellow-400/30 shadow-lg'
           : instantWinAvailable
             ? 'border-yellow-400 shadow-yellow-400/40 shadow-lg'
-            : 'border-gray-300 hover:border-gray-400',
+            : comboLevel === 3
+              ? 'border-purple-400 shadow-purple-400/30 shadow-md'
+              : comboLevel === 2
+                ? 'border-violet-400 shadow-violet-400/20 shadow-sm'
+                : comboLevel === 1
+                  ? 'border-blue-400 shadow-blue-400/20 shadow-sm'
+                  : 'border-gray-300 hover:border-gray-400',
         disabled && 'opacity-50 cursor-not-allowed',
         !disabled && 'cursor-pointer hover:-translate-y-1',
       )}
